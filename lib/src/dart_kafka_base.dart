@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:typed_data/typed_data.dart';
 
 class KafkaException implements Exception {
   final String message;
@@ -22,7 +21,9 @@ class KafkaClient {
   String? _memberId;
   String? _generationId;
   Map<String, dynamic> _producerConfigurations;
-  bool _isStaticMember = false; // Static membership flag
+  bool _isStaticMember = false;
+  final CorrelationIdGenerator correlationIdGenerator =
+      CorrelationIdGenerator();
 
   KafkaClient(
     this._host,
@@ -45,7 +46,7 @@ class KafkaClient {
   Future<void> disconnect() async {
     if (_socket != null) {
       if (_groupId != null && _memberId != null) {
-        await _leaveGroup(); // Gracefully leave the group on disconnect
+        await _leaveGroup();
       }
       _socket!.destroy();
     }
@@ -119,7 +120,6 @@ class KafkaClient {
     print('Heartbeat successful');
   }
 
-  // LeaveGroup to gracefully leave the consumer group
   Future<void> _leaveGroup() async {
     if (_socket == null || _groupId == null || _memberId == null) {
       throw KafkaException('Not connected or not part of a consumer group', -1);
@@ -189,11 +189,10 @@ class KafkaClient {
   }
 
   void _startHeartbeat() {
-    // Send a heartbeat every 3 seconds
     Future.doWhile(() async {
       await _sendHeartbeat();
       await Future.delayed(Duration(seconds: 3));
-      return true; // Keep sending heartbeats
+      return true;
     });
   }
 
@@ -237,54 +236,42 @@ class KafkaClient {
     Map<String, dynamic> configurations,
   ) {
     final builder = BytesBuilder();
+    _buildBaseHeader(
+      builder,
+      0, // API Key for Produce
+      7, // API Version
+      configurations['client.id'] ?? 'dart-kafka-client',
+    );
 
-    // API Key: Produce (0)
-    builder.addByte(0);
-
-    // API Version: 7
-    builder.add([0, 7]);
-
-    // Correlation ID: 1
-    builder.add([0, 0, 0, 1]);
-
-    // Client ID: "dart-kafka-client"
-    final clientId =
-        utf8.encode(configurations['client.id'] ?? 'dart-kafka-client');
-    builder.add([0, 0]);
-    builder.add([clientId.length.toUnsigned(16)]);
-    builder.add(clientId);
-
-    // Transactional ID: null (or provided in configurations)
     final transactionalId = configurations['transactional.id'];
     if (transactionalId != null) {
       final transactionalIdBytes = utf8.encode(transactionalId);
-      builder.add([transactionalIdBytes.length.toUnsigned(16)]);
+      builder.add(_int16(transactionalIdBytes.length));
       builder.add(transactionalIdBytes);
     } else {
-      builder.add([255, 255, 255, 255]); // Null
+      builder.add([0xFF, 0xFF]); // Null Transactional ID
     }
 
-    // Required Acks: -1 (all replicas) or provided in configurations
+    // Required Acks (Int16)
     final acks = configurations['acks'] ?? -1;
-    builder.add(acks.toUnsigned(32));
+    builder.add(_int16(acks));
 
-    // Timeout: 30000 ms or provided in configurations
+    // Timeout (Int32)
     final timeoutMs = configurations['request.timeout.ms'] ?? 30000;
-    builder.add(timeoutMs.toUnsigned(32));
+    builder.add(_int32(timeoutMs));
 
     // Topic Data
-    builder.add([0, 0, 0, 1]); // 1 topic
     final topicBytes = utf8.encode(topic);
-    builder.add([topicBytes.length.toUnsigned(16)]);
+    builder.add(_int16(topicBytes.length)); // Topic name length (Int16)
     builder.add(topicBytes);
 
     // Partition Data
-    builder.add([0, 0, 0, 1]); // 1 partition
-    builder.add([0, 0, 0, 0]); // Partition ID 0
+    builder.add([0, 0, 0, 1]); // Number of partitions (Int32)
+    builder.add([0, 0, 0, 0]); // Partition ID (Int32)
 
     // Record Set
     final recordSet = _createRecordSet(message, configurations);
-    builder.add([recordSet.length.toUnsigned(32)]);
+    builder.add(_int32(recordSet.length)); // Record batch size (Int32)
     builder.add(recordSet);
 
     return builder.toBytes();
@@ -296,68 +283,45 @@ class KafkaClient {
   ) {
     final builder = BytesBuilder();
 
-    // Record
-    builder.add([0, 0, 0, 0, 0, 0, 0, 0]); // Offset
-    builder.add([0, 0, 0, 0]); // Message Size
-    builder.add([0, 0]); // CRC
-    builder.add([0]); // Magic Byte
+    // Kafka Record Batch Header (Mandatory Fields)
+    builder.add(
+        [0, 0, 0, 0, 0, 0, 0, 0]); // Base Offset (Int64, always 0 in request)
+    final recordData = BytesBuilder();
 
-    // Attributes: Compression type (provided in configurations)
-    final compressionType = configurations['compression.type'] ?? 'none';
-    final compressionCode = _getCompressionCode(compressionType);
-    builder.add([compressionCode]);
+    // Mandatory Kafka Batch Fields
+    recordData.add(_int32(0)); // Partition Leader Epoch (Int32)
+    recordData.add([2]); // Magic Byte (Int8, v2)
+    recordData.add(_int32(0)); // Placeholder for CRC (Int32, calculated later)
+    recordData.add(_int16(0)); // Attributes (Int16)
+    recordData.add(_int32(1)); // Last Offset Delta (Int32)
+    recordData.add(_int64(
+        DateTime.now().millisecondsSinceEpoch)); // First Timestamp (Int64)
+    recordData.add(
+        _int64(DateTime.now().millisecondsSinceEpoch)); // Max Timestamp (Int64)
+    recordData.add(_int64(0)); // Producer ID (Int64)
+    recordData.add(_int16(0)); // Producer Epoch (Int16)
+    recordData.add(_int32(0)); // Base Sequence (Int32)
 
-    // Timestamp: Current time or provided in configurations
-    final timestamp =
-        configurations['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
-    builder.add(timestamp.toUnsigned(64));
-
-    // Key: null or provided in configurations
-    final key = configurations['key'];
-    if (key != null) {
-      final keyBytes = utf8.encode(key);
-      builder.add([keyBytes.length.toUnsigned(32)]);
-      builder.add(keyBytes);
-    } else {
-      builder.add([255, 255, 255, 255]); // Null
-    }
-
-    // Value: message
+    // Single Record Inside the Batch
     final messageBytes = utf8.encode(message);
-    builder.add([messageBytes.length.toUnsigned(32)]);
-    builder.add(messageBytes);
+    recordData.add(_varInt(messageBytes.length + 5)); // Length (VarInt)
+    recordData.add([0]); // Attributes (Int8)
+    recordData.add([0]); // Timestamp Delta (VarInt)
+    recordData.add([0]); // Offset Delta (VarInt)
+    recordData.add([0]); // Key Length (Null)
+    recordData.add(_varInt(messageBytes.length)); // Message Length (VarInt)
+    recordData.add(messageBytes);
 
-    // Headers: empty or provided in configurations
-    final headers = configurations['headers'] ?? {};
-    builder.add(headers.length.toUnsigned(32));
-    for (final entry in headers.entries) {
-      final keyBytes = utf8.encode(entry.key);
-      final valueBytes = utf8.encode(entry.value);
-      builder.add([keyBytes.length.toUnsigned(16)]);
-      builder.add(keyBytes);
-      builder.add([valueBytes.length.toUnsigned(16)]);
-      builder.add(valueBytes);
-    }
+    // Compute CRC32 over batch (excluding Magic Byte and CRC field itself)
+    final recordBytes = recordData.toBytes();
+    final crc = _computeCRC32(recordBytes.sublist(5)); // Skip Magic Byte and CRC field
+    recordBytes.setRange(5, 9, _int32(crc)); // Insert CRC value
+
+    // Add Record Batch Length
+    builder.add(_int32(recordBytes.length));
+    builder.add(recordBytes);
 
     return builder.toBytes();
-  }
-
-  int _getCompressionCode(String compressionType) {
-    switch (compressionType) {
-      case 'none':
-        return 0;
-      case 'gzip':
-        return 1;
-      case 'snappy':
-        return 2;
-      case 'lz4':
-        return 3;
-      case 'zstd':
-        return 4;
-      default:
-        throw KafkaException(
-            'Unsupported compression type: $compressionType', -1);
-    }
   }
 
   Future<void> consume(String topic) async {
@@ -370,12 +334,18 @@ class KafkaClient {
       _socket!.add(request);
       await _socket!.flush();
 
-      final response = await _socket!.fold<Uint8List>(
-        Uint8List(0),
-        (previous, element) => Uint8List.fromList([...previous, ...element]),
-      );
+      await _socket!.listen((event) => print("Recebido: $event"),
+          onError: (err) => print("Erro: $err"));
 
-      _processFetchResponse(response);
+      // final response = await _socket!
+      //     .fold<Uint8List>(
+      //       Uint8List(0),
+      //       (previous, element) =>
+      //           Uint8List.fromList([...previous, ...element]),
+      //     )
+      //     .timeout(Duration(minutes: 1));
+
+      // _processFetchResponse(response);
     } on SocketException catch (e) {
       throw KafkaException(
           'Network error while consuming messages: ${e.message}', -1);
@@ -384,21 +354,7 @@ class KafkaClient {
 
   Uint8List _createFetchRequest(String topic) {
     final builder = BytesBuilder();
-
-    // API Key: Fetch (1)
-    builder.addByte(1);
-
-    // API Version: 11
-    builder.add([0, 11]);
-
-    // Correlation ID: 2
-    builder.add([0, 0, 0, 2]);
-
-    // Client ID: "dart-kafka-client"
-    final clientId = utf8.encode('dart-kafka-client');
-    builder.add([0, 0]);
-    builder.add([clientId.length.toUnsigned(16)]);
-    builder.add(clientId);
+    _buildBaseHeader(builder, 1, 7, 'dart-kafka-client');
 
     // Replica ID: -1
     builder.add([255, 255, 255, 255]);
@@ -410,7 +366,7 @@ class KafkaClient {
     builder.add([0, 0, 0, 1]);
 
     // Max Bytes: 1048576
-    builder.add([0, 15, 255, 255]);
+    builder.add([0x00, 0x10, 0x00, 0x00]);
 
     // Isolation Level: 0
     builder.add([0]);
@@ -422,18 +378,25 @@ class KafkaClient {
     builder.add([255, 255, 255, 255]);
 
     // Topic Data
-    builder.add([0, 0, 0, 1]); // 1 topic
+    // builder.add([0, 0, 0, 1]); // Topics Count
+
     final topicBytes = utf8.encode(topic);
-    builder.add([topicBytes.length.toUnsigned(16)]);
+    ByteData _2ByteData = ByteData(2);
+    _2ByteData.setUint16(0, topicBytes.length);
+    builder.add(_2ByteData.buffer.asUint8List().toList(growable: false));
     builder.add(topicBytes);
 
     // Partition Data
-    builder.add([0, 0, 0, 1]); // 1 partition
+    // builder.add([0, 0, 0, 1]); // Partitions Count
     builder.add([0, 0, 0, 0]); // Partition ID 0
-    builder.add([0, 0, 0, 0]); // Current Leader Epoch
-    builder.add([0, 0, 0, 0]); // Fetch Offset
-    builder.add([0, 0, 0, 0]); // Log Start Offset
-    builder.add([0, 0, 0, 1]); // Partition Max Bytes
+    // builder.add([0xFF, 0xFF, 0xFF, 0xFF]); // Current Leader Epoch
+    builder.add([0, 0, 0, 0, 0, 0, 0, 0]); // Fetch Offset
+    builder.add(
+        [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]); // Log Start Offset
+    builder.add([0xFF, 0x10, 0x00, 0x00]); // Partition Max Bytes
+
+    // forgotten_topics_data
+    // builder.add(bytes)
 
     return builder.toBytes();
   }
@@ -461,7 +424,6 @@ class KafkaClient {
     _groupId = groupId;
 
     try {
-      // Step 1: Join Group
       final joinGroupRequest = _createJoinGroupRequest(
         groupId,
         topics,
@@ -477,7 +439,6 @@ class KafkaClient {
 
       _memberId = _processJoinGroupResponse(joinGroupResponse);
 
-      // Step 2: Sync Group
       final syncGroupRequest = _createSyncGroupRequest(groupId, _memberId!);
       _socket!.add(syncGroupRequest);
       await _socket!.flush();
@@ -502,34 +463,25 @@ class KafkaClient {
     required Map<String, dynamic> configurations,
   }) {
     final builder = BytesBuilder();
-
-    // API Key: JoinGroup (11)
-    builder.addByte(11);
-
-    // API Version: 5
-    builder.add([0, 5]);
-
-    // Correlation ID: 3
-    builder.add([0, 0, 0, 3]);
-
-    // Client ID: "dart-kafka-client"
-    final clientId = utf8.encode('dart-kafka-client');
-    builder.add([0, 0]);
-    builder.add([clientId.length.toUnsigned(16)]);
-    builder.add(clientId);
+    _buildBaseHeader(builder, 11, 7, 'dart-kafka-client');
 
     // Group ID
     final groupIdBytes = utf8.encode(groupId);
-    builder.add([groupIdBytes.length.toUnsigned(16)]);
+    ByteData _2ByteData = ByteData(2);
+    _2ByteData.setUint16(0, groupIdBytes.length);
+    builder.add(_2ByteData.buffer.asUint8List().toList(growable: false));
     builder.add(groupIdBytes);
 
     // Session Timeout
     final sessionTimeoutMs = configurations['session.timeout.ms'] ?? 10000;
-    builder.add(sessionTimeoutMs.toUnsigned(32));
+    ByteData _4byteData = ByteData(4);
+    _4byteData.setUint32(0, sessionTimeoutMs);
+    builder.add(_4byteData.buffer.asUint8List().toList(growable: false));
 
     // Rebalance Timeout
     final rebalanceTimeoutMs = configurations['rebalance.timeout.ms'] ?? 30000;
-    builder.add(rebalanceTimeoutMs.toUnsigned(32));
+    _4byteData.setUint32(0, rebalanceTimeoutMs);
+    builder.add(_4byteData.buffer.asUint8List().toList(growable: false));
 
     // Member ID: "" (empty string for new member)
     builder.add([0, 0]);
@@ -584,8 +536,9 @@ class KafkaClient {
     return builder.toBytes();
   }
 
-  String _processJoinGroupResponse(Uint8List response) {
+  String? _processJoinGroupResponse(Uint8List response) {
     // Extract Member ID from the response
+    if (response.isEmpty) return null;
     final errorCode = ByteData.sublistView(response.sublist(4, 8)).getInt32(0);
     if (errorCode != 0) {
       throw KafkaException('Failed to join group', errorCode);
@@ -874,5 +827,107 @@ class KafkaClient {
     }
 
     print('Offset fetch response: ${utf8.decode(response)}');
+  }
+
+  void _buildBaseHeader(
+      BytesBuilder builder, int apiKey, int apiVersion, String clientId) {
+    builder.add(_int16(apiKey));
+    builder.add(_int16(apiVersion));
+
+    // generate the CorrelationId
+    List<int> correlationId = correlationIdGenerator.generate();
+    builder.add(correlationId);
+
+    // transform clientId to byte-level
+    Uint8List clientIdBytes = utf8.encode(clientId);
+    ByteData clientIdByteData = ByteData(2);
+    clientIdByteData.setUint16(0, clientIdBytes.length);
+    List<int> clientIdBytesLength =
+        clientIdByteData.buffer.asUint8List().toList(growable: false);
+    builder.add(clientIdBytesLength);
+    builder.add(clientIdBytes);
+  }
+
+  /// Helper to encode Int16 in Big Endian
+  Uint8List _int16(int value) {
+    final data = ByteData(2);
+    data.setInt16(0, value, Endian.big);
+    return data.buffer.asUint8List();
+  }
+
+  /// Helper to encode Int32 in Big Endian
+  Uint8List _int32(int value) {
+    final data = ByteData(4);
+    data.setInt32(0, value, Endian.big);
+    return data.buffer.asUint8List();
+  }
+
+  /// Helper to encode Int64 in Big Endian
+  Uint8List _int64(int value) {
+    final data = ByteData(8);
+    data.setInt64(0, value, Endian.big);
+    return data.buffer.asUint8List();
+  }
+
+  /// Encode VarInt (Kafka uses variable-length encoding)
+  Uint8List _varInt(int value) {
+    final buffer = BytesBuilder();
+    while ((value & ~0x7F) != 0) {
+      buffer.addByte((value & 0x7F) | 0x80);
+      value >>= 7;
+    }
+    buffer.addByte(value);
+    return buffer.toBytes();
+  }
+
+  /// Compute CRC32 checksum
+  int _computeCRC32(Uint8List data) {
+    const int polynomial = 0x82F63B78; // Reversed representation of 0x1EDC6F41
+
+    // Initialize CRC value
+    int crc = 0xFFFFFFFF;
+
+    // Process each byte in the input data
+    for (final byte in data) {
+      crc ^= byte;
+      for (int i = 0; i < 8; i++) {
+        if (crc & 1 == 1) {
+          crc = (crc >> 1) ^ polynomial;
+        } else {
+          crc = crc >> 1;
+        }
+      }
+    }
+
+    return crc ^ 0xFFFFFFFF;
+  }
+}
+
+class CorrelationIdGenerator {
+  static int _lastTimestamp = 0;
+  static int _counter = 0;
+
+  static int next() {
+    int now = DateTime.now().millisecondsSinceEpoch;
+
+    if (now == _lastTimestamp) {
+      _counter++;
+    } else {
+      _counter = 0;
+      _lastTimestamp = now;
+    }
+
+    return (now << 16) | (_counter & 0xFFFF);
+  }
+
+  static Uint8List correlationIdToList(int correlationId) {
+    ByteData byteData = ByteData(4);
+    byteData.setUint32(0, correlationId, Endian.big);
+
+    return byteData.buffer.asUint8List();
+  }
+
+  List<int> generate() {
+    return correlationIdToList(next()).toList(growable: false);
   }
 }
