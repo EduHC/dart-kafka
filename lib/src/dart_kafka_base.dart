@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:typed_data/typed_data.dart';
 
 class KafkaException implements Exception {
   final String message;
@@ -19,7 +20,9 @@ class KafkaClient {
   Socket? _socket;
   String? _groupId;
   String? _memberId;
+  String? _generationId;
   Map<String, dynamic> _producerConfigurations;
+  bool _isStaticMember = false; // Static membership flag
 
   KafkaClient(
     this._host,
@@ -40,7 +43,158 @@ class KafkaClient {
   }
 
   Future<void> disconnect() async {
-    _socket?.destroy();
+    if (_socket != null) {
+      if (_groupId != null && _memberId != null) {
+        await _leaveGroup(); // Gracefully leave the group on disconnect
+      }
+      _socket!.destroy();
+    }
+  }
+
+  Future<void> _sendHeartbeat() async {
+    if (_socket == null ||
+        _groupId == null ||
+        _memberId == null ||
+        _generationId == null) {
+      throw KafkaException('Not connected or not part of a consumer group', -1);
+    }
+
+    try {
+      final request = _createHeartbeatRequest();
+      _socket!.add(request);
+      await _socket!.flush();
+
+      final response = await _socket!.fold<Uint8List>(
+        Uint8List(0),
+        (previous, element) => Uint8List.fromList([...previous, ...element]),
+      );
+
+      _processHeartbeatResponse(response);
+    } on SocketException catch (e) {
+      throw KafkaException(
+          'Network error while sending heartbeat: ${e.message}', -1);
+    }
+  }
+
+  Uint8List _createHeartbeatRequest() {
+    final builder = BytesBuilder();
+
+    // API Key: Heartbeat (12)
+    builder.addByte(12);
+
+    // API Version: 4
+    builder.add([0, 4]);
+
+    // Correlation ID: 8
+    builder.add([0, 0, 0, 8]);
+
+    // Client ID: "dart-kafka-client"
+    final clientId = utf8.encode('dart-kafka-client');
+    builder.add([0, 0]);
+    builder.add([clientId.length.toUnsigned(16)]);
+    builder.add(clientId);
+
+    // Group ID
+    final groupIdBytes = utf8.encode(_groupId!);
+    builder.add([groupIdBytes.length.toUnsigned(16)]);
+    builder.add(groupIdBytes);
+
+    // Generation ID
+    builder.add([int.parse(_generationId!).toUnsigned(32)]);
+
+    // Member ID
+    final memberIdBytes = utf8.encode(_memberId!);
+    builder.add([memberIdBytes.length.toUnsigned(16)]);
+    builder.add(memberIdBytes);
+
+    return builder.toBytes();
+  }
+
+  void _processHeartbeatResponse(Uint8List response) {
+    final errorCode = ByteData.sublistView(response.sublist(4, 8)).getInt32(0);
+    if (errorCode != 0) {
+      throw KafkaException('Failed to send heartbeat', errorCode);
+    }
+
+    print('Heartbeat successful');
+  }
+
+  // LeaveGroup to gracefully leave the consumer group
+  Future<void> _leaveGroup() async {
+    if (_socket == null || _groupId == null || _memberId == null) {
+      throw KafkaException('Not connected or not part of a consumer group', -1);
+    }
+
+    try {
+      final request = _createLeaveGroupRequest();
+      _socket!.add(request);
+      await _socket!.flush();
+
+      final response = await _socket!.fold<Uint8List>(
+        Uint8List(0),
+        (previous, element) => Uint8List.fromList([...previous, ...element]),
+      );
+
+      _processLeaveGroupResponse(response);
+    } on SocketException catch (e) {
+      throw KafkaException(
+          'Network error while leaving group: ${e.message}', -1);
+    }
+  }
+
+  Uint8List _createLeaveGroupRequest() {
+    final builder = BytesBuilder();
+
+    // API Key: LeaveGroup (13)
+    builder.addByte(13);
+
+    // API Version: 3
+    builder.add([0, 3]);
+
+    // Correlation ID: 9
+    builder.add([0, 0, 0, 9]);
+
+    // Client ID: "dart-kafka-client"
+    final clientId = utf8.encode('dart-kafka-client');
+    builder.add([0, 0]);
+    builder.add([clientId.length.toUnsigned(16)]);
+    builder.add(clientId);
+
+    // Group ID
+    final groupIdBytes = utf8.encode(_groupId!);
+    builder.add([groupIdBytes.length.toUnsigned(16)]);
+    builder.add(groupIdBytes);
+
+    // Member ID
+    final memberIdBytes = utf8.encode(_memberId!);
+    builder.add([memberIdBytes.length.toUnsigned(16)]);
+    builder.add(memberIdBytes);
+
+    return builder.toBytes();
+  }
+
+  void _processLeaveGroupResponse(Uint8List response) {
+    final errorCode = ByteData.sublistView(response.sublist(4, 8)).getInt32(0);
+    if (errorCode != 0) {
+      throw KafkaException('Failed to leave group', errorCode);
+    }
+
+    print('Successfully left the consumer group');
+  }
+
+  // Static membership support
+  void enableStaticMembership(String memberId) {
+    _isStaticMember = true;
+    _memberId = memberId;
+  }
+
+  void _startHeartbeat() {
+    // Send a heartbeat every 3 seconds
+    Future.doWhile(() async {
+      await _sendHeartbeat();
+      await Future.delayed(Duration(seconds: 3));
+      return true; // Keep sending heartbeats
+    });
   }
 
   Future<void> produce(
@@ -334,6 +488,9 @@ class KafkaClient {
       );
 
       _processSyncGroupResponse(syncGroupResponse);
+
+      // Start sending heartbeats
+      _startHeartbeat();
     } on SocketException catch (e) {
       throw KafkaException('Network error while subscribing: ${e.message}', -1);
     }
