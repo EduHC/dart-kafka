@@ -8,6 +8,10 @@ void main() async {
     await kafkaClient.connect();
     print('Connected to Kafka broker');
 
+    // Step 2: Produce a message to a topic
+    await kafkaClient.produce('test-topic', 'Hello, Kafka!');
+    print('Produced message to test-topic');
+
     // Step 4: Subscribe to a topic as part of a consumer group
     // await kafkaClient.subscribe('test-group', ['test-topic']);
     // print('Subscribed to test-topic as part of test-group');
@@ -15,10 +19,6 @@ void main() async {
     // Step 5: Consume messages from the topic
     // await kafkaClient.consume('test-topic');
     // print('Consumed messages from test-topic');
-
-    // Step 2: Produce a message to a topic
-    await kafkaClient.produce('test-topic', 'Hello, Kafka!');
-    print('Produced message to test-topic');
 
     // Step 6: Keep the application running to allow heartbeats and message consumption
     // print('Waiting for messages and heartbeats...');
@@ -37,4 +37,3 @@ void main() async {
     await kafkaClient.disconnect();
   }
 }
-

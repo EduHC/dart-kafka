@@ -314,7 +314,8 @@ class KafkaClient {
 
     // Compute CRC32 over batch (excluding Magic Byte and CRC field itself)
     final recordBytes = recordData.toBytes();
-    final crc = _computeCRC32(recordBytes.sublist(5)); // Skip Magic Byte and CRC field
+    final crc =
+        _computeCRC32(recordBytes.sublist(5)); // Skip Magic Byte and CRC field
     recordBytes.setRange(5, 9, _int32(crc)); // Insert CRC value
 
     // Add Record Batch Length
@@ -334,6 +335,16 @@ class KafkaClient {
       _socket!.add(request);
       await _socket!.flush();
 
+      await _socket!.listen((event) => print("Recebido: $event"),
+          onError: (err) => print("Erro: $err"));
+
+      // final response = await _socket!
+      //     .fold<Uint8List>(
+      //       Uint8List(0),
+      //       (previous, element) =>
+      //           Uint8List.fromList([...previous, ...element]),
+      //     )
+      //     .timeout(Duration(minutes: 1));
       await _socket!.listen((event) => print("Recebido: $event"),
           onError: (err) => print("Erro: $err"));
 
@@ -596,8 +607,8 @@ class KafkaClient {
     print('Received SyncGroup response: ${utf8.decode(response)}');
   }
 
-  // Offset Control Methods
 
+  // Offset Control Methods
   Future<Map<String, int>> fetchOffsets(String topic, int partition) async {
     if (_socket == null) {
       throw KafkaException('Not connected to Kafka broker', -1);
