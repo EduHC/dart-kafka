@@ -2,10 +2,10 @@ import 'package:dart_kafka/src/kafka_admin.dart';
 import 'package:dart_kafka/src/kafka_client.dart';
 
 void main() async {
-  KafkaClient kafka = KafkaClient(host: '192.168.4.163', port: 29092);
+  KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
   await kafka.connect();
-  
-  if(kafka.server == null) {
+
+  if (kafka.server == null) {
     print("Socket não conectado");
     return;
   }

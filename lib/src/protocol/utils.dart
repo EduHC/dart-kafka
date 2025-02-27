@@ -1,6 +1,13 @@
 import 'dart:typed_data';
 
 class Utils {
+  /// Helper to encode Int8
+  Uint8List int8(int value) {
+    final data = ByteData(1);
+    data.setInt8(0, value);
+    return data.buffer.asUint8List();
+  }
+
   /// Helper to encode Int16 in Big Endian
   Uint8List int16(int value) {
     final data = ByteData(2);
