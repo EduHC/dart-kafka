@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 class Utils {
@@ -38,5 +39,12 @@ class Utils {
     }
     buffer.addByte(value);
     return buffer.toBytes();
+  }
+
+  /// Generate a random CorrelationID
+  int generateCorrelationId() {
+    final Random random = Random();
+    int value = random.nextInt(1 << 32);
+    return value - (1 << 31); // Convert to signed int32 range
   }
 }

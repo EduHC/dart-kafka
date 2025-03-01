@@ -3,8 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dart_kafka/src/protocol/response_controller.dart';
-
-typedef Deserializer = dynamic Function(Uint8List data);
+import 'package:dart_kafka/src/typedefs/types.dart';
 
 class KafkaClient {
   late final Socket? _socket;
@@ -36,7 +35,8 @@ class KafkaClient {
   }
 
   void _handleResponse(Uint8List response) {
-    responseController.handleResponse(response);
+    responseController.enqueue(response);
+    responseController.drainQueue();
   }
 
   void addPendingRequest(
@@ -48,4 +48,5 @@ class KafkaClient {
   void completeRequest({required int correlationId}) {
     responseController.completeRequest(correlationId: correlationId);
   }
+
 }

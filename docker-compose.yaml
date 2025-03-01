@@ -1,6 +1,6 @@
 services:
   kafka-controller-1:
-    image: apache/kafka:latest
+    image: apache/kafka:3.8.0-rc2
     container_name: kafka-controller-1
     environment:
       KAFKA_NODE_ID: 1
@@ -37,7 +37,7 @@ services:
   #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:9093,2@kafka-controller-2:9094,3@kafka-controller-3:9095
   
   kafka-broker-1:
-    image: apache/kafka:latest
+    image: apache/kafka:3.8.0-rc2
     container_name: kafka-broker-1
     ports:
       - 29092:9090

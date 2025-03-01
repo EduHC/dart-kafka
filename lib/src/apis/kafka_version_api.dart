@@ -1,21 +1,19 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/src/models/api_version.dart';
-import 'package:dart_kafka/src/models/api_version_response.dart';
+import 'package:dart_kafka/src/models/components/api_version.dart';
+import 'package:dart_kafka/src/models/responses/api_version_response.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 import 'package:dart_kafka/src/protocol/apis.dart';
 
 class KafkaVersionApi {
   final int apiKey;
-  final int apiVersion;
   final Utils utils = Utils();
 
-  KafkaVersionApi()
-      : apiKey = API_VERSIONS,
-        apiVersion = 2;
+  KafkaVersionApi() : apiKey = API_VERSIONS;
 
   /// Serialize the ApiVersionRequest to Byte
-  Uint8List serialize({required int correlationId, String? clientId}) {
+  Uint8List serialize(
+      {required int correlationId, String? clientId, required int apiVersion}) {
     final byteBuffer = BytesBuilder();
     byteBuffer.add(utils.int16(apiKey));
     byteBuffer.add(utils.int16(apiVersion));
@@ -34,14 +32,20 @@ class KafkaVersionApi {
   }
 
   /// Deserializes the ApiVersionResponse from a byte array.
-  dynamic deserialize(Uint8List data) {
+  dynamic deserialize(Uint8List data, int apiVersion) {
     final byteData = ByteData.sublistView(data);
 
     switch (apiVersion) {
       case 0:
-        return _deserialize0(byteData: byteData, messageLength: data.length);
+        return _deserialize0(
+            byteData: byteData,
+            messageLength: data.length,
+            apiVersion: apiVersion);
       case 1:
-        return _deserialize1(byteData: byteData, messageLength: data.length);
+        return _deserialize1(
+            byteData: byteData,
+            messageLength: data.length,
+            apiVersion: apiVersion);
 
       default:
         return null;
@@ -49,13 +53,16 @@ class KafkaVersionApi {
   }
 
   KafkaApiVersionResponse? _deserialize0(
-      {required ByteData byteData, required int messageLength}) {
+      {required ByteData byteData,
+      required int messageLength,
+      required int apiVersion}) {
     int offset = 0;
     final errorCode = byteData.getInt16(offset);
     offset += 2;
 
     final apiVersions = <ApiVersion>[];
-    while (offset < messageLength) {
+    while (offset < (messageLength - 4)) {
+      // removed the final 4 bytes of throttleTimeMs
       final apiKey = byteData.getInt16(offset);
       offset += 2;
 
@@ -72,8 +79,11 @@ class KafkaVersionApi {
       ));
     }
 
-    final throttleTimeMs = byteData.getInt32(offset);
-    offset += 4;
+    int? throttleTimeMs;
+    if (apiVersion > 0) {
+      byteData.getInt32(offset);
+      offset += 4;
+    }
 
     return KafkaApiVersionResponse(
       version: apiVersion,
@@ -84,7 +94,9 @@ class KafkaVersionApi {
   }
 
   KafkaApiVersionResponse? _deserialize1(
-      {required ByteData byteData, required int messageLength}) {
+      {required ByteData byteData,
+      required int messageLength,
+      required int apiVersion}) {
     int offset = 0;
     final errorCode = byteData.getInt16(offset);
     offset += 2;

@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/src/models/api_version.dart';
+import 'package:dart_kafka/src/models/components/api_version.dart';
 
 class KafkaApiVersionResponse {
   final int version;

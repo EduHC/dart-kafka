@@ -1,13 +1,39 @@
 import 'dart:collection';
 import 'dart:typed_data';
 
-import 'package:dart_kafka/src/models/message_header.dart';
-
-typedef Deserializer = dynamic Function(Uint8List data);
+import 'package:dart_kafka/src/models/components/message_header.dart';
+import 'package:dart_kafka/src/typedefs/types.dart';
 
 class ResponseController {
-  final HashMap<int, Function> _pendingRequests = HashMap<int, Function>();
-  final HashMap<int, Uint8List> _pendingResponses = HashMap<int, Uint8List>();
+  final HashMap<int, Function> _pendingRequests = HashMap();
+  final HashMap<int, Map<String, dynamic>> _pendingResponses = HashMap();
+  final Queue _messageQueue = Queue<List<int>>();
+  bool isDraining = false;
+
+  void enqueue(Uint8List messages) {
+    final byteData = ByteData.sublistView(messages);
+    int offset = 0;
+
+    while (offset < messages.length) {
+      int messageLength = byteData.getInt32(offset);
+      _messageQueue.add(messages.sublist(offset, (offset + messageLength + 4).toInt()));
+      offset += messageLength + 4;
+    }
+  }
+
+  Future<void> drainQueue() async {
+    if (isDraining) {
+      return;
+    }
+
+    while (_messageQueue.isNotEmpty) {
+      isDraining = true;
+      final element = _messageQueue.removeFirst();
+      handleResponse(element);
+    }
+
+    isDraining = false;
+  }
 
   Future<void> handleResponse(Uint8List response) async {
     if (response.length < 14) {
@@ -21,14 +47,18 @@ class ResponseController {
 
     if (!_pendingRequests.containsKey(header.correlationId)) {
       _pendingResponses.addAll({
-        header.correlationId:
-            byteData.buffer.asUint8List().sublist(header.offset)
+        header.correlationId: {
+          'apiVersion': header.apiVersion,
+          'message': byteData.buffer.asUint8List().sublist(header.offset)
+        }
       });
       return;
     }
-    
+
     final deserializer = _pendingRequests[header.correlationId]!;
-    deserializer(byteData.buffer.asUint8List().sublist(header.offset));
+    Uint8List message = byteData.buffer.asUint8List().sublist(header.offset);
+    dynamic entity = deserializer(message, header.apiVersion);
+    print("Event = $entity");
     completeRequest(correlationId: header.correlationId);
   }
 
@@ -37,7 +67,8 @@ class ResponseController {
     if (_pendingRequests.containsKey(correlationId)) return;
 
     if (_pendingResponses.containsKey(correlationId)) {
-      deserializer(_pendingResponses[correlationId]!);
+      deserializer(_pendingResponses[correlationId]!['message'],
+          _pendingResponses[correlationId]!['apiVersion']);
       return;
     }
 
