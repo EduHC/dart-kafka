@@ -1,4 +1,5 @@
 # Kafka Dart
+***[STATUS] Work in progress!***
 
 **License:** MIT
 
