@@ -192,204 +192,168 @@ class KafkaFetchApi {
       topics: topics,
     );
   }
-}
 
-RecordBatch? _decodeRecordBatch(Uint8List data, int apiVersion) {
-  if (data.isEmpty) return null;
+  RecordBatch? _decodeRecordBatch(Uint8List data, int apiVersion) {
+    if (data.isEmpty) return null;
 
-  final buffer = ByteData.sublistView(Uint8List.fromList(data.toList()));
-  int offset = 0;
+    final buffer = ByteData.sublistView(Uint8List.fromList(data.toList()));
+    int offset = 0;
 
-  final int baseOffset = buffer.getInt64(offset, Endian.big);
-  offset += 8;
+    final int baseOffset = buffer.getInt64(offset, Endian.big);
+    offset += 8;
 
-  final int batchLength = buffer.getInt32(offset, Endian.big);
-  offset += 4;
-
-  final int partitionLeaderEpoch = buffer.getInt32(offset, Endian.big);
-  offset += 4;
-
-  final int magic = buffer.getInt8(offset);
-  offset += 1;
-
-  final int crc = buffer.getInt32(offset, Endian.big);
-  offset += 4;
-
-  final int attributes = buffer.getInt16(offset, Endian.big);
-  offset += 2;
-
-  final int lastOffsetDelta = buffer.getInt32(offset, Endian.big);
-  offset += 4;
-
-  final int baseTimestamp = buffer.getInt64(offset, Endian.big);
-  offset += 8;
-
-  final int maxTimestamp = buffer.getInt64(offset, Endian.big);
-  offset += 8;
-
-  final int producerId = buffer.getInt64(offset, Endian.big);
-  offset += 8;
-
-  final int producerEpoch = buffer.getInt16(offset, Endian.big);
-  offset += 2;
-
-  final int baseSequence = buffer.getInt32(offset, Endian.big);
-  offset += 4;
-
-  final int recordsLength = buffer.getInt32(offset, Endian.big);
-  offset += 4;
-
-  final List<Record> records = [];
-
-  for (int i = 0; i < recordsLength; i++) {
-    var result = _readVarint(data.toList(), offset, signed: false);
-    final int recordLength = result.value;
-    offset += result.bytesRead;
-
-    final int attributes = buffer.getInt8(offset);
-    offset += 1;
-
-    result = _readVarint(data.toList(), offset, signed: true);
-    final int timestampDelta = result.value;
-    offset += result.bytesRead;
-
-    result = _readVarint(data.toList(), offset, signed: true);
-    final int offsetDelta = result.value;
-    offset += result.bytesRead;
-
-    result = _readVarint(data.toList(), offset);
-    final int keyLength = result.value;
-    offset += result.bytesRead;
-
-    final String? key = keyLength == -1
-        ? null
-        : String.fromCharCodes(buffer.buffer.asUint8List(offset, keyLength));
-    offset += keyLength == -1 ? 0 : keyLength;
-
-    result = _readVarint(data.toList(), offset);
-    final int valueLength = result.value;
-    offset += result.bytesRead;
-
-    final String? value = valueLength == -1
-        ? null
-        : String.fromCharCodes(buffer.buffer.asUint8List(offset, valueLength));
-    offset += valueLength == -1 ? 0 : valueLength;
-
-    final int headersLength = buffer.getInt32(offset, Endian.big);
+    final int batchLength = buffer.getInt32(offset, Endian.big);
     offset += 4;
 
-    final List<RecordHeader> headers = [];
-    for (int j = 0; j < headersLength; j++) {
-      result = _readVarint(data.toList(), offset);
-      final int headerKeyLength = result.value;
+    final int partitionLeaderEpoch = buffer.getInt32(offset, Endian.big);
+    offset += 4;
+
+    final int magic = buffer.getInt8(offset);
+    offset += 1;
+
+    final int crc = buffer.getUint32(offset, Endian.big);
+    offset += 4;
+
+    final int attributes = buffer.getInt16(offset, Endian.big);
+    offset += 2;
+
+    final int lastOffsetDelta = buffer.getInt32(offset, Endian.big);
+    offset += 4;
+
+    final int baseTimestamp = buffer.getInt64(offset, Endian.big);
+    offset += 8;
+
+    final int maxTimestamp = buffer.getInt64(offset, Endian.big);
+    offset += 8;
+
+    final int producerId = buffer.getInt64(offset, Endian.big);
+    offset += 8;
+
+    final int producerEpoch = buffer.getInt16(offset, Endian.big);
+    offset += 2;
+
+    final int baseSequence = buffer.getInt32(offset, Endian.big);
+    offset += 4;
+
+    final int recordsLength = buffer.getInt32(offset, Endian.big);
+    offset += 4;
+
+    final List<Record> records = [];
+
+    for (int i = 0; i < recordsLength; i++) {
+      var result = utils.readVarint(data.toList(), offset, signed: false);
+      final int recordLength = result.value;
       offset += result.bytesRead;
 
-      final String headerKey = String.fromCharCodes(
-          buffer.buffer.asUint8List(offset, headerKeyLength));
-      offset += headerKeyLength;
+      final int attributes = buffer.getInt8(offset);
+      offset += 1;
 
-      result = _readVarint(data.toList(), offset);
-      final int headerValueLength = result.value;
+      result = utils.readVarint(
+        data.toList(),
+        offset,
+      );
+      final int timestampDelta = result.value;
       offset += result.bytesRead;
 
-      final String headerValue = String.fromCharCodes(
-          buffer.buffer.asUint8List(offset, headerValueLength));
-      offset += headerValueLength;
+      result = utils.readVarint(
+        data.toList(),
+        offset,
+      );
+      final int offsetDelta = result.value;
+      offset += result.bytesRead;
 
-      headers.add(RecordHeader(
-        headerKey: headerKey,
-        headerKeyLength: headerKeyLength,
-        headerValue: headerValue,
-        headerValueLength: headerValueLength,
+      result = utils.readVarint(
+        data.toList(),
+        offset,
+      );
+      final int keyLength = result.value;
+      offset += result.bytesRead;
+
+      final String? key = keyLength == -1
+          ? null
+          : String.fromCharCodes(buffer.buffer.asUint8List(offset, keyLength));
+      offset += keyLength == -1 ? 0 : keyLength;
+
+      result = utils.readVarint(
+        data.toList(),
+        offset,
+      );
+      final int valueLength = result.value;
+      offset += result.bytesRead;
+
+      final String? value = valueLength == -1
+          ? null
+          : String.fromCharCodes(
+              buffer.buffer.asUint8List(offset, valueLength));
+      offset += valueLength == -1 ? 0 : valueLength;
+
+      bool hasHeaders = utils.canRead(
+          currentOffset: offset, amountOfBytes: 4, data: data.toList());
+
+      if (hasHeaders) {
+        result = utils.readVarint(
+          data.toList(),
+          offset,
+        );
+      }
+
+      final int headersLength = hasHeaders ? result.value : 0;
+      offset += hasHeaders ? result.bytesRead : 0;
+
+      final List<RecordHeader> headers = [];
+      for (int j = 0; j < headersLength; j++) {
+        result = utils.readVarint(
+          data.toList(),
+          offset,
+        );
+        final int headerKeyLength = result.value;
+        offset += result.bytesRead;
+
+        final String headerKey = String.fromCharCodes(
+            buffer.buffer.asUint8List(offset, headerKeyLength));
+        offset += headerKeyLength;
+
+        result = utils.readVarint(data.toList(), offset);
+        final int headerValueLength = result.value;
+        offset += result.bytesRead;
+
+        final String headerValue = String.fromCharCodes(
+            buffer.buffer.asUint8List(offset, headerValueLength));
+        offset += headerValueLength;
+
+        headers.add(RecordHeader(
+          headerKey: headerKey,
+          headerKeyLength: headerKeyLength,
+          headerValue: headerValue,
+          headerValueLength: headerValueLength,
+        ));
+      }
+
+      records.add(Record(
+        length: recordLength,
+        attributes: attributes,
+        timestampDelta: timestampDelta,
+        offsetDelta: offsetDelta,
+        key: key,
+        value: value,
+        headers: headers,
       ));
     }
 
-    records.add(Record(
-      length: recordLength,
+    return RecordBatch(
+      baseOffset: baseOffset,
+      batchLength: batchLength,
+      partitionLeaderEpoch: partitionLeaderEpoch,
+      magic: magic,
+      crc: crc,
       attributes: attributes,
-      timestampDelta: timestampDelta,
-      offsetDelta: offsetDelta,
-      key: key,
-      value: value,
-      headers: headers,
-    ));
+      lastOffsetDelta: lastOffsetDelta,
+      baseTimestamp: baseTimestamp,
+      maxTimestamp: maxTimestamp,
+      producerId: producerId,
+      producerEpoch: producerEpoch,
+      baseSequence: baseSequence,
+      records: records,
+    );
   }
-
-  return RecordBatch(
-    baseOffset: baseOffset,
-    batchLength: batchLength,
-    partitionLeaderEpoch: partitionLeaderEpoch,
-    magic: magic,
-    crc: crc,
-    attributes: attributes,
-    lastOffsetDelta: lastOffsetDelta,
-    baseTimestamp: baseTimestamp,
-    maxTimestamp: maxTimestamp,
-    producerId: producerId,
-    producerEpoch: producerEpoch,
-    baseSequence: baseSequence,
-    records: records,
-  );
-}
-
-({int value, int bytesRead}) _readVarint(List<int> byteArray, int offset,
-    {bool signed = false}) {
-  int value = 0;
-  int shift = 0;
-  int pos = offset;
-  int bytesRead = 0;
-
-  print("Reading VarInt at offset: $offset");
-  while (true) {
-    if (pos >= byteArray.length) {
-      throw Exception("Unexpected end of data while reading VarInt.");
-    }
-
-    int byte = byteArray[pos];
-    print("Byte read: ${byte.toRadixString(16)} at position $pos");
-    pos++;
-    bytesRead++;
-
-    value |= (byte & 0x7F) << shift;
-    shift += 7;
-
-    if ((byte & 0x80) == 0) break;
-  }
-
-  if (signed) {
-    value = (value >>> 1) ^ -(value & 1); // ZigZag Decoding
-  }
-
-  print("Decoded VarInt: $value, Bytes Read: $bytesRead\n");
-  return (value: value, bytesRead: bytesRead);
-}
-
-({int value, int bytesRead}) _readVarlong(List<int> byteArray, int offset,
-    {bool signed = false}) {
-  int value = 0;
-  int shift = 0;
-  int bytesRead = 0;
-  int byte;
-
-  do {
-    if (offset + bytesRead >= byteArray.length) {
-      throw Exception("Invalid byte array: Insufficient bytes to read varlong");
-    }
-
-    if (shift > 63) {
-      throw Exception("Invalid Long, must contain 9 bytes or less");
-    }
-
-    byte = byteArray[offset + bytesRead];
-    value |= (byte & 0x7F) << shift;
-    shift += 7;
-    bytesRead++;
-  } while ((byte & 0x80) != 0);
-
-  // Apply zigzag decoding if signed is true
-  if (signed) {
-    value = (value >> 1) ^ -(value & 1);
-  }
-
-  return (value: value, bytesRead: bytesRead);
 }
