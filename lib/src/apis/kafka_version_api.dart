@@ -34,6 +34,7 @@ class KafkaVersionApi {
   /// Deserializes the ApiVersionResponse from a byte array.
   dynamic deserialize(Uint8List data, int apiVersion) {
     final byteData = ByteData.sublistView(data);
+    int offset = 0;
 
     switch (apiVersion) {
       case 0:
@@ -57,11 +58,15 @@ class KafkaVersionApi {
       required int messageLength,
       required int apiVersion}) {
     int offset = 0;
-    final errorCode = byteData.getInt16(offset);
+    final errorCode = byteData.getInt16(offset, Endian.big);
     offset += 2;
 
+    final int arrayLength = byteData.getInt32(offset, Endian.big);
+    offset += 4;
+
     final apiVersions = <ApiVersion>[];
-    while (offset < (messageLength - 4)) {
+    int index = 0;
+    while (index < arrayLength) {
       // removed the final 4 bytes of throttleTimeMs
       final apiKey = byteData.getInt16(offset);
       offset += 2;
@@ -77,6 +82,8 @@ class KafkaVersionApi {
         minVersion: minVersion,
         maxVersion: maxVersion,
       ));
+
+      index++;
     }
 
     int? throttleTimeMs;

@@ -5,7 +5,7 @@ import 'package:dart_kafka/src/models/components/message_header.dart';
 import 'package:dart_kafka/src/typedefs/types.dart';
 
 class ResponseController {
-  final HashMap<int, Function> _pendingRequests = HashMap();
+  final HashMap<int, Map<String, dynamic>> _pendingRequests = HashMap();
   final HashMap<int, Map<String, dynamic>> _pendingResponses = HashMap();
   final Queue _messageQueue = Queue<List<int>>();
   bool isDraining = false;
@@ -16,7 +16,8 @@ class ResponseController {
 
     while (offset < messages.length) {
       int messageLength = byteData.getInt32(offset);
-      _messageQueue.add(messages.sublist(offset, (offset + messageLength + 4).toInt()));
+      _messageQueue
+          .add(messages.sublist(offset, (offset + messageLength + 4).toInt()));
       offset += messageLength + 4;
     }
   }
@@ -55,15 +56,19 @@ class ResponseController {
       return;
     }
 
-    final deserializer = _pendingRequests[header.correlationId]!;
+    final int apiVersion =
+        _pendingRequests[header.correlationId]!['apiVersion'];
+    final deserializer = _pendingRequests[header.correlationId]!['function'];
     Uint8List message = byteData.buffer.asUint8List().sublist(header.offset);
-    dynamic entity = deserializer(message, header.apiVersion);
+    dynamic entity = deserializer(message, apiVersion);
     print("Event = $entity");
     completeRequest(correlationId: header.correlationId);
   }
 
   void addPendingRequest(
-      {required int correlationId, required Deserializer deserializer}) {
+      {required int correlationId,
+      required Deserializer deserializer,
+      required int apiVersion}) {
     if (_pendingRequests.containsKey(correlationId)) return;
 
     if (_pendingResponses.containsKey(correlationId)) {
@@ -72,7 +77,9 @@ class ResponseController {
       return;
     }
 
-    _pendingRequests.addAll({correlationId: deserializer});
+    _pendingRequests.addAll({
+      correlationId: {'apiVersion': apiVersion, 'function': deserializer}
+    });
   }
 
   void completeRequest({required int correlationId}) {
@@ -86,21 +93,13 @@ class ResponseController {
     final byteData = ByteData.sublistView(response);
     int offset = 0;
 
-    final int messageLength = byteData.getInt32(offset);
+    final int messageLength = byteData.getInt32(offset, Endian.big);
     offset += 4;
 
-    final int correlationId = byteData.getInt32(offset);
+    final int correlationId = byteData.getInt32(offset, Endian.big);
     offset += 4;
-
-    final int apiKey = byteData.getInt16(offset);
-    offset += 2;
-
-    final int apiVersion = byteData.getInt16(offset);
-    offset += 2;
 
     return MessageHeader(
-        apiKey: apiKey,
-        apiVersion: apiVersion,
         messageLength: messageLength,
         correlationId: correlationId,
         offset: offset);

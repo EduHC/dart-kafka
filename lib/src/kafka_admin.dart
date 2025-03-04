@@ -11,7 +11,7 @@ class KafkaAdmin {
   final KafkaVersionApi versionApi = KafkaVersionApi();
   final KafkaMetadataApi metadataApi = KafkaMetadataApi();
   final Utils utils = Utils();
-  
+
   KafkaAdmin({required this.kafka});
 
   Future<void> sendApiVersionRequest({
@@ -35,7 +35,8 @@ class KafkaAdmin {
 
     kafka.addPendingRequest(
         correlationId: finalCorrelationId,
-        deserializer: versionApi.deserialize);
+        deserializer: versionApi.deserialize,
+        apiVersion: apiVersion ?? 0);
   }
 
   Future<void> sendMetadataRequest(
@@ -54,7 +55,7 @@ class KafkaAdmin {
     Uint8List message = metadataApi.serialize(
         correlationId: finalCorrelationId,
         topics: topics,
-        apiVersion: 5,
+        apiVersion: apiVersion ?? 5,
         clientId: clientId,
         allowAutoTopicCreation: true,
         includeClusterAuthorizedOperations: false,
@@ -66,6 +67,7 @@ class KafkaAdmin {
 
     kafka.addPendingRequest(
         correlationId: finalCorrelationId,
-        deserializer: metadataApi.deserialize);
+        deserializer: metadataApi.deserialize,
+        apiVersion: apiVersion ?? 5);
   }
 }

@@ -3,7 +3,7 @@ import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/topic.dart';
 
 void main() async {
-  KafkaClient kafka = KafkaClient(host: '192.168.4.163', port: 29092);
+  final KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
   await kafka.connect();
 
   if (kafka.server == null) {
@@ -17,7 +17,7 @@ void main() async {
   // await admin.sendApiVersionRequest(apiVersion: 0, clientId: 'test');
   // await admin.sendMetadataRequest(
   //     topics: ['test-topic'],
-  //     allowAutoTopicCreation: false,
+  //     allowAutoTopicCreation: true,
   //     includeClusterAuthorizedOperations: true,
   //     includeTopicAuthorizedOperations: true,
   //     clientId: 'test',
@@ -29,5 +29,11 @@ void main() async {
         partitions: [Partition(partitionId: 0, logStartOffset: 0)])
   ];
   await consumer.sendFetchRequest(
-      clientId: 'consumer', topics: topics, isolationLevel: 0, apiVersion: 8);
+    clientId: 'consumer',
+    topics: topics,
+    isolationLevel: 0,
+    apiVersion: 8,
+  );
+
+  // await kafka.close();
 }

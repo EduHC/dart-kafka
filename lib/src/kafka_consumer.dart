@@ -25,7 +25,7 @@ class KafkaConsumer {
     required List<Topic> topics,
   }) async {
     Socket? server = kafka.server;
-    
+
     if (server == null) return;
 
     int finalCorrelationId = utils.generateCorrelationId();
@@ -46,6 +46,8 @@ class KafkaConsumer {
     await server.flush();
 
     kafka.addPendingRequest(
-        correlationId: finalCorrelationId, deserializer: fetchApi.deserialize);
+        correlationId: finalCorrelationId,
+        deserializer: fetchApi.deserialize,
+        apiVersion: apiVersion ?? 17);
   }
 }

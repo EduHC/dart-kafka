@@ -380,8 +380,7 @@ class KafkaMetadataApi {
         offset += rackLength;
       }
 
-      brokers
-          .add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
+      brokers.add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
     }
 
     final int controllerId = buffer.getInt32(offset);
@@ -530,8 +529,7 @@ class KafkaMetadataApi {
         offset += rackLength;
       }
 
-      brokers
-          .add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
+      brokers.add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
     }
 
     final int clusterIdLength = buffer.getInt16(offset);
@@ -699,8 +697,7 @@ class KafkaMetadataApi {
         offset += rackLength;
       }
 
-      brokers
-          .add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
+      brokers.add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
     }
 
     final int clusterIdLength = buffer.getInt16(offset);
@@ -833,8 +830,11 @@ class KafkaMetadataApi {
     final List<Broker> brokers = [];
     final List<KafkaTopicMetadata> topics = [];
 
-    final int brokersLength = buffer.getInt32(offset);
+    final int throttleTimeMs = buffer.getInt32(offset);
     offset += 4;
+
+    final int brokersLength = buffer.getInt16(offset);
+    offset += 2;
 
     if (brokersLength < 0) {
       throw Exception("Invalid brokersLength: $brokersLength");
@@ -871,8 +871,7 @@ class KafkaMetadataApi {
         offset += rackLength;
       }
 
-      brokers
-          .add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
+      brokers.add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
     }
 
     final int clusterIdLength = buffer.getInt16(offset);
@@ -986,19 +985,12 @@ class KafkaMetadataApi {
       ));
     }
 
-    final int throttleTimeMs = buffer.getInt32(offset);
-    offset += 4;
-
-    final int clusterAuthorizedOperations = buffer.getInt32(offset);
-    offset += 4;
-
     return MetadataResponse(
       throttleTimeMs: throttleTimeMs,
       brokers: brokers,
       topics: topics,
       controllerId: controllerId,
       clusterId: clusterId,
-      clusterAuthorizedOperations: clusterAuthorizedOperations,
     );
   }
 }

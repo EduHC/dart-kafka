@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:dart_kafka/src/models/components/aborted_transactions.dart';
+import 'package:dart_kafka/src/models/components/record_batch.dart';
+import 'package:dart_kafka/src/models/components/record.dart';
+import 'package:dart_kafka/src/models/components/record_header.dart';
 import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/responses/fetch_response.dart';
 import 'package:dart_kafka/src/models/topic.dart';
@@ -46,7 +49,7 @@ class KafkaFetchApi {
 
     // Add isolation level (0 = read_uncommitted, 1 = read_committed)
     byteBuffer.add(utils.int8(isolationLevel));
-    
+
     // Add session ID and epoch (only for versions >= 7)
     if (apiVersion >= 7) {
       byteBuffer.add(utils.int32(0)); // Session ID (default to 0)
@@ -64,7 +67,8 @@ class KafkaFetchApi {
       for (final partition in topic.partitions) {
         byteBuffer.add(utils.int32(partition.partitionId));
         byteBuffer.add(utils.int64(partition.fetchOffset ?? 0));
-        byteBuffer.add(utils.int64(partition.logStartOffset)); // Log start offset (only for versions >= 5)
+        byteBuffer.add(utils.int64(partition
+            .logStartOffset)); // Log start offset (only for versions >= 5)
         byteBuffer.add(utils.int32(partition.maxBytes ?? 45));
       }
     }
@@ -95,21 +99,22 @@ class KafkaFetchApi {
     int offset = 0;
 
     // Read the response fields
-    final int throttleTimeMs = buffer.getInt32(offset);
+    final int throttleTimeMs = buffer.getInt32(offset, Endian.big);
     offset += 4;
 
-    final int errorCode = buffer.getInt16(offset);
+    final int errorCode = buffer.getInt16(offset, Endian.big);
     offset += 2;
 
-    final int sessionId = apiVersion >= 7 ? buffer.getInt32(offset) : 0;
+    final int sessionId =
+        apiVersion >= 7 ? buffer.getInt32(offset, Endian.big) : 0;
     offset += apiVersion >= 7 ? 4 : 0;
 
     final List<Topic> topics = [];
-    final int topicsLength = buffer.getInt32(offset);
+    final int topicsLength = buffer.getInt32(offset, Endian.big);
     offset += 4;
 
     for (int i = 0; i < topicsLength; i++) {
-      final int topicNameLength = buffer.getInt16(offset);
+      final int topicNameLength = buffer.getInt16(offset, Endian.big);
       offset += 2;
 
       final String topicName = String.fromCharCodes(
@@ -117,37 +122,37 @@ class KafkaFetchApi {
       offset += topicNameLength;
 
       final List<Partition> partitions = [];
-      final int partitionsLength = buffer.getInt32(offset);
+      final int partitionsLength = buffer.getInt32(offset, Endian.big);
       offset += 4;
 
       for (int j = 0; j < partitionsLength; j++) {
-        final int partitionId = buffer.getInt32(offset);
+        final int partitionId = buffer.getInt32(offset, Endian.big);
         offset += 4;
 
-        final int partitionErrorCode = buffer.getInt16(offset);
+        final int partitionErrorCode = buffer.getInt16(offset, Endian.big);
         offset += 2;
 
-        final int highWatermark = buffer.getInt64(offset);
+        final int highWatermark = buffer.getInt64(offset, Endian.big);
         offset += 8;
 
         final int lastStableOffset =
-            apiVersion >= 4 ? buffer.getInt64(offset) : -1;
+            apiVersion >= 4 ? buffer.getInt64(offset, Endian.big) : -1;
         offset += apiVersion >= 4 ? 8 : 0;
 
         final int logStartOffset =
-            apiVersion >= 5 ? buffer.getInt64(offset) : -1;
+            apiVersion >= 5 ? buffer.getInt64(offset, Endian.big) : -1;
         offset += apiVersion >= 5 ? 8 : 0;
 
         final int abortedTransactionsLength =
-            apiVersion >= 4 ? buffer.getInt32(offset) : 0;
+            apiVersion >= 4 ? buffer.getInt32(offset, Endian.big) : 0;
         offset += apiVersion >= 4 ? 4 : 0;
 
         final List<AbortedTransaction> abortedTransactions = [];
         for (int k = 0; k < abortedTransactionsLength; k++) {
-          final int producerId = buffer.getInt64(offset);
+          final int producerId = buffer.getInt64(offset, Endian.big);
           offset += 8;
 
-          final int firstOffset = buffer.getInt64(offset);
+          final int firstOffset = buffer.getInt64(offset, Endian.big);
           offset += 8;
 
           abortedTransactions.add(AbortedTransaction(
@@ -156,11 +161,11 @@ class KafkaFetchApi {
           ));
         }
 
-        final int recordsLength = buffer.getInt32(offset);
+        final int recordsLength = buffer.getInt32(offset, Endian.big);
         offset += 4;
 
-        final Uint8List records =
-            buffer.buffer.asUint8List(offset, recordsLength);
+        final RecordBatch? batch = _decodeRecordBatch(
+            buffer.buffer.asUint8List(offset, recordsLength), apiVersion);
         offset += recordsLength;
 
         partitions.add(Partition(
@@ -170,7 +175,7 @@ class KafkaFetchApi {
           lastStableOffset: lastStableOffset,
           logStartOffset: logStartOffset,
           abortedTransactions: abortedTransactions,
-          records: records,
+          records: batch,
         ));
       }
 
@@ -187,4 +192,204 @@ class KafkaFetchApi {
       topics: topics,
     );
   }
+}
+
+RecordBatch? _decodeRecordBatch(Uint8List data, int apiVersion) {
+  if (data.isEmpty) return null;
+
+  final buffer = ByteData.sublistView(Uint8List.fromList(data.toList()));
+  int offset = 0;
+
+  final int baseOffset = buffer.getInt64(offset, Endian.big);
+  offset += 8;
+
+  final int batchLength = buffer.getInt32(offset, Endian.big);
+  offset += 4;
+
+  final int partitionLeaderEpoch = buffer.getInt32(offset, Endian.big);
+  offset += 4;
+
+  final int magic = buffer.getInt8(offset);
+  offset += 1;
+
+  final int crc = buffer.getInt32(offset, Endian.big);
+  offset += 4;
+
+  final int attributes = buffer.getInt16(offset, Endian.big);
+  offset += 2;
+
+  final int lastOffsetDelta = buffer.getInt32(offset, Endian.big);
+  offset += 4;
+
+  final int baseTimestamp = buffer.getInt64(offset, Endian.big);
+  offset += 8;
+
+  final int maxTimestamp = buffer.getInt64(offset, Endian.big);
+  offset += 8;
+
+  final int producerId = buffer.getInt64(offset, Endian.big);
+  offset += 8;
+
+  final int producerEpoch = buffer.getInt16(offset, Endian.big);
+  offset += 2;
+
+  final int baseSequence = buffer.getInt32(offset, Endian.big);
+  offset += 4;
+
+  final int recordsLength = buffer.getInt32(offset, Endian.big);
+  offset += 4;
+
+  final List<Record> records = [];
+
+  for (int i = 0; i < recordsLength; i++) {
+    var result = _readVarint(data.toList(), offset, signed: false);
+    final int recordLength = result.value;
+    offset += result.bytesRead;
+
+    final int attributes = buffer.getInt8(offset);
+    offset += 1;
+
+    result = _readVarint(data.toList(), offset, signed: true);
+    final int timestampDelta = result.value;
+    offset += result.bytesRead;
+
+    result = _readVarint(data.toList(), offset, signed: true);
+    final int offsetDelta = result.value;
+    offset += result.bytesRead;
+
+    result = _readVarint(data.toList(), offset);
+    final int keyLength = result.value;
+    offset += result.bytesRead;
+
+    final String? key = keyLength == -1
+        ? null
+        : String.fromCharCodes(buffer.buffer.asUint8List(offset, keyLength));
+    offset += keyLength == -1 ? 0 : keyLength;
+
+    result = _readVarint(data.toList(), offset);
+    final int valueLength = result.value;
+    offset += result.bytesRead;
+
+    final String? value = valueLength == -1
+        ? null
+        : String.fromCharCodes(buffer.buffer.asUint8List(offset, valueLength));
+    offset += valueLength == -1 ? 0 : valueLength;
+
+    final int headersLength = buffer.getInt32(offset, Endian.big);
+    offset += 4;
+
+    final List<RecordHeader> headers = [];
+    for (int j = 0; j < headersLength; j++) {
+      result = _readVarint(data.toList(), offset);
+      final int headerKeyLength = result.value;
+      offset += result.bytesRead;
+
+      final String headerKey = String.fromCharCodes(
+          buffer.buffer.asUint8List(offset, headerKeyLength));
+      offset += headerKeyLength;
+
+      result = _readVarint(data.toList(), offset);
+      final int headerValueLength = result.value;
+      offset += result.bytesRead;
+
+      final String headerValue = String.fromCharCodes(
+          buffer.buffer.asUint8List(offset, headerValueLength));
+      offset += headerValueLength;
+
+      headers.add(RecordHeader(
+        headerKey: headerKey,
+        headerKeyLength: headerKeyLength,
+        headerValue: headerValue,
+        headerValueLength: headerValueLength,
+      ));
+    }
+
+    records.add(Record(
+      length: recordLength,
+      attributes: attributes,
+      timestampDelta: timestampDelta,
+      offsetDelta: offsetDelta,
+      key: key,
+      value: value,
+      headers: headers,
+    ));
+  }
+
+  return RecordBatch(
+    baseOffset: baseOffset,
+    batchLength: batchLength,
+    partitionLeaderEpoch: partitionLeaderEpoch,
+    magic: magic,
+    crc: crc,
+    attributes: attributes,
+    lastOffsetDelta: lastOffsetDelta,
+    baseTimestamp: baseTimestamp,
+    maxTimestamp: maxTimestamp,
+    producerId: producerId,
+    producerEpoch: producerEpoch,
+    baseSequence: baseSequence,
+    records: records,
+  );
+}
+
+({int value, int bytesRead}) _readVarint(List<int> byteArray, int offset,
+    {bool signed = false}) {
+  int value = 0;
+  int shift = 0;
+  int pos = offset;
+  int bytesRead = 0;
+
+  print("Reading VarInt at offset: $offset");
+  while (true) {
+    if (pos >= byteArray.length) {
+      throw Exception("Unexpected end of data while reading VarInt.");
+    }
+
+    int byte = byteArray[pos];
+    print("Byte read: ${byte.toRadixString(16)} at position $pos");
+    pos++;
+    bytesRead++;
+
+    value |= (byte & 0x7F) << shift;
+    shift += 7;
+
+    if ((byte & 0x80) == 0) break;
+  }
+
+  if (signed) {
+    value = (value >>> 1) ^ -(value & 1); // ZigZag Decoding
+  }
+
+  print("Decoded VarInt: $value, Bytes Read: $bytesRead\n");
+  return (value: value, bytesRead: bytesRead);
+}
+
+({int value, int bytesRead}) _readVarlong(List<int> byteArray, int offset,
+    {bool signed = false}) {
+  int value = 0;
+  int shift = 0;
+  int bytesRead = 0;
+  int byte;
+
+  do {
+    if (offset + bytesRead >= byteArray.length) {
+      throw Exception("Invalid byte array: Insufficient bytes to read varlong");
+    }
+
+    if (shift > 63) {
+      throw Exception("Invalid Long, must contain 9 bytes or less");
+    }
+
+    byte = byteArray[offset + bytesRead];
+    value |= (byte & 0x7F) << shift;
+    shift += 7;
+    bytesRead++;
+  } while ((byte & 0x80) != 0);
+
+  // Apply zigzag decoding if signed is true
+  if (signed) {
+    value = (value >> 1) ^ -(value & 1);
+  }
+
+  return (value: value, bytesRead: bytesRead);
 }

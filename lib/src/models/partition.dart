@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:dart_kafka/src/models/components/aborted_transactions.dart';
+import 'package:dart_kafka/src/models/components/record_batch.dart';
 
 class Partition {
   final int partitionId;
@@ -13,7 +14,7 @@ class Partition {
   final int? highWatermark;
   final int? lastStableOffset;
   final List<AbortedTransaction>? abortedTransactions;
-  final Uint8List? records;
+  final RecordBatch? records;
 
   Partition(
       {required this.partitionId,

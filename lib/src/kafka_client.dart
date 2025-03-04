@@ -40,13 +40,16 @@ class KafkaClient {
   }
 
   void addPendingRequest(
-      {required int correlationId, required Deserializer deserializer}) {
+      {required int correlationId,
+      required Deserializer deserializer,
+      required int apiVersion}) {
     responseController.addPendingRequest(
-        correlationId: correlationId, deserializer: deserializer);
+        correlationId: correlationId,
+        deserializer: deserializer,
+        apiVersion: apiVersion);
   }
 
   void completeRequest({required int correlationId}) {
     responseController.completeRequest(correlationId: correlationId);
   }
-
 }
