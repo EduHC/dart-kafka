@@ -8,10 +8,8 @@ import 'package:dart_kafka/src/models/responses/metadata_response.dart';
 import 'package:dart_kafka/src/protocol/apis.dart';
 
 class KafkaMetadataApi {
-  final int apiKey;
+  final int apiKey = METADATA;
   final Utils utils = Utils();
-
-  KafkaMetadataApi() : apiKey = METADATA;
 
   /// Method to serialize to build and serialize the MetadataRequest to Byte Array
   /// Default value of allowAutoTopicCreation is FALSE

@@ -14,7 +14,7 @@ class Partition {
   final int? highWatermark;
   final int? lastStableOffset;
   final List<AbortedTransaction>? abortedTransactions;
-  final RecordBatch? records;
+  final RecordBatch? batch;
 
   Partition(
       {required this.partitionId,
@@ -25,12 +25,12 @@ class Partition {
       this.errorCode,
       this.lastStableOffset,
       this.highWatermark,
-      this.records});
+      this.batch});
 
   @override
   String toString() {
     return "Partition -> id: $partitionId, fetchOffset: $fetchOffset, logStartOffset: $logStartOffset, maxBytes: $maxBytes, "
         "errorCode: $errorCode, highWatermark: $highWatermark, lastStableOffset: $lastStableOffset, "
-        "abortedTransactions: $abortedTransactions, records: $records";
+        "abortedTransactions: $abortedTransactions, batch: $batch";
   }
 }

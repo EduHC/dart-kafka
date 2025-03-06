@@ -6,10 +6,8 @@ import 'package:dart_kafka/src/protocol/utils.dart';
 import 'package:dart_kafka/src/protocol/apis.dart';
 
 class KafkaVersionApi {
-  final int apiKey;
+  final int apiKey = API_VERSIONS;
   final Utils utils = Utils();
-
-  KafkaVersionApi() : apiKey = API_VERSIONS;
 
   /// Serialize the ApiVersionRequest to Byte
   Uint8List serialize(

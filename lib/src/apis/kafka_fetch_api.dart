@@ -11,10 +11,8 @@ import 'package:dart_kafka/src/protocol/utils.dart';
 import 'package:dart_kafka/src/protocol/apis.dart';
 
 class KafkaFetchApi {
-  final int apiKey;
+  final int apiKey = FETCH;
   Utils utils = Utils();
-
-  KafkaFetchApi() : apiKey = FETCH;
 
   /// Method to serialize to build and serialize the FetchRequest to Byte Array
   Uint8List serialize({
@@ -175,7 +173,7 @@ class KafkaFetchApi {
           lastStableOffset: lastStableOffset,
           logStartOffset: logStartOffset,
           abortedTransactions: abortedTransactions,
-          records: batch,
+          batch: batch,
         ));
       }
 
@@ -330,14 +328,14 @@ class KafkaFetchApi {
       }
 
       records.add(Record(
-        length: recordLength,
-        attributes: attributes,
-        timestampDelta: timestampDelta,
-        offsetDelta: offsetDelta,
-        key: key,
-        value: value,
-        headers: headers,
-      ));
+          length: recordLength,
+          attributes: attributes,
+          timestampDelta: timestampDelta,
+          offsetDelta: offsetDelta,
+          key: key,
+          value: value,
+          headers: headers,
+          timestamp: DateTime.now().millisecondsSinceEpoch));
     }
 
     return RecordBatch(
