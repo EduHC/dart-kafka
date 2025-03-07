@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:dart_kafka/src/models/components/record.dart';
-import 'package:dart_kafka/src/models/components/record_header.dart';
+import 'package:dart_kafka/src/protocol/crc32.dart';
 
 class Utils {
+  int crc32c(Uint8List data) {
+    return CRC32C.calculate(data);
+  }
+
   Uint8List int8(int value) {
     final data = ByteData(1);
     data.setInt8(0, value);
@@ -19,6 +24,12 @@ class Utils {
   Uint8List int32(int value) {
     final data = ByteData(4);
     data.setInt32(0, value, Endian.big);
+    return data.buffer.asUint8List();
+  }
+
+  Uint8List uint32(int value) {
+    final data = ByteData(4);
+    data.setUint32(0, value, Endian.big);
     return data.buffer.asUint8List();
   }
 
@@ -49,8 +60,8 @@ class Utils {
   }
 
   Uint8List string(String value) {
-    final bytes = Uint8List.fromList(value.codeUnits);
-    return Uint8List.fromList([bytes.length, ...bytes]);
+    final bytes = utf8.encode(value);
+    return Uint8List.fromList([...int16(bytes.length), ...bytes]);
   }
 
   Uint8List nullableString(String? value) {
@@ -61,7 +72,7 @@ class Utils {
   }
 
   Uint8List compactString(String value) {
-    final bytes = Uint8List.fromList(value.codeUnits);
+    final bytes = utf8.encode(value);
     final length = encodeUnsignedVarint(bytes.length + 1);
     return Uint8List.fromList([...length, ...bytes]);
   }
@@ -79,55 +90,48 @@ class Utils {
   }
 
   Uint8List compactArrayLength(int length) {
-    return encodeUnsignedVarint(length == 0 ? 0 : length + 1);
+    return encodeUnsignedVarint(length < 0 ? 0 : length + 1);
   }
 
   Uint8List tagBuffer() {
     return Uint8List(0);
   }
 
-  Uint8List records(List<Record> records) {
+  Uint8List recordBatch(List<Record> records) {
     BytesBuilder batchBuffer = BytesBuilder();
 
-    batchBuffer.add(int64(0));
-    batchBuffer.add(int32(0)); // partitionLeaderEpoch
-    batchBuffer.addByte(2); // magic
     batchBuffer.add(int16(0)); // attributes
-    batchBuffer.add(varInt(records.length - 1));
-
-    // BaseTimestamp (Using first record timestamp as base)
-    batchBuffer.add(int64(records.first.timestamp));
-    // MaxTimestamp (Using last record timestamp)
-    batchBuffer.add(int64(records.last.timestamp));
-
-    batchBuffer.add(int64(0)); // ProducerId
+    batchBuffer.add(int32(0)); // lastOffsetDelta
+    batchBuffer.add(int64(records.first.timestamp)); // BaseTimestamp
+    batchBuffer.add(int64(records.last.timestamp)); // maxTimestamp
+    batchBuffer.add(int64(0)); // ProducerId || mandando como 0
     batchBuffer.add(int16(0)); // ProducerEpoch
     batchBuffer.add(int32(0)); // BaseSequence
-    batchBuffer.add(varInt(records.length));
+    batchBuffer.add(compactArrayLength(records.length));
 
     // Encode each record
     for (var record in records) {
       BytesBuilder recordBuffer = BytesBuilder();
 
-      recordBuffer.addByte(0);
-      recordBuffer.add(varLong(record.timestamp - records.first.timestamp));
-      recordBuffer.add(varInt(records.indexOf(record)));
+      recordBuffer.addByte(0); // Attributes
+      recordBuffer.add(varLong(record.timestamp - records.first.timestamp)); // timestampDelta
+      recordBuffer.add(varInt(records.indexOf(record))); // offsetDelta
 
       if (record.key != null) {
         recordBuffer.add(varInt(record.key!.length));
-        recordBuffer.add(record.key!.codeUnits);
+        recordBuffer.add(utf8.encode(record.key!)); // testar colocar ut8.encode
       } else {
-        recordBuffer.add(varInt(-1));
+        recordBuffer.add(varInt(0));
       }
 
       if (record.value != null) {
         recordBuffer.add(varInt(record.value!.length));
-        recordBuffer.add(record.value!.codeUnits);
+        recordBuffer.add(utf8.encode(record.value!)); // testar colocar ut8.encode
       } else {
-        recordBuffer.add(varInt(-1));
+        recordBuffer.add(varInt(0));
       }
 
-      recordBuffer.add(varInt(record.headers?.length ?? 0));
+      recordBuffer.add(compactArrayLength(record.headers?.length ?? 0));
       for (var header in record.headers ?? []) {
         recordBuffer.add(varInt(header.headerKey.length));
         recordBuffer.add(header.headerKey.codeUnits);
@@ -135,12 +139,20 @@ class Utils {
         recordBuffer.add(header.headerValue.codeUnits);
       }
 
-      batchBuffer.add(varInt(recordBuffer.length));
-      batchBuffer.add(recordBuffer.toBytes());
+      batchBuffer
+          .add([...varInt(recordBuffer.length), ...recordBuffer.toBytes()]);
     }
 
+    Uint8List message = batchBuffer.toBytes();
+
+    // Add the PartitionLeaderEpoch, magic, Checksum and 3 more null tagged_fields
+    message = Uint8List.fromList(
+        [...int32(0), ...int8(2), ...uint32(crc32c(message)), ...message]);
+    batchBuffer.clear();
+
+    // Add the BatchOffset and BatchLength
     return Uint8List.fromList(
-        [0, batchBuffer.toBytes().length, ...batchBuffer.toBytes()]);
+        [...int64(0), ...int32(message.length), ...message]);
   }
 
   /// Generate a random CorrelationID

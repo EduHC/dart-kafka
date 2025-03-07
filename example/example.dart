@@ -17,10 +17,7 @@ void main() async {
     return;
   }
 
-  KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
-
   // TESTING THE ADMIN COMMANDS
-
   // KafkaAdmin admin = KafkaAdmin(kafka: kafka);
   // await admin.sendApiVersionRequest(apiVersion: 0, clientId: 'test');
   // await admin.sendMetadataRequest(
@@ -32,10 +29,11 @@ void main() async {
   //     apiVersion: 12);
 
   // TESTING THE CONSUMER COMMANDS
+  // KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
   // List<Topic> topics = [
-  //   Topic(
-  //       topicName: 'test-topic',
-  //       partitions: [Partition(partitionId: 0, logStartOffset: 0, fetchOffset: 1)])
+  //   Topic(topicName: 'test-topic', partitions: [
+  //     Partition(partitionId: 0, logStartOffset: 0, fetchOffset: 0)
+  //   ])
   // ];
   // await consumer.sendFetchRequest(
   //   clientId: 'consumer',
@@ -43,7 +41,6 @@ void main() async {
   //   isolationLevel: 0,
   //   apiVersion: 8,
   // );
-
   // List<Protocol> protocols = [
   //   Protocol(
   //       name: 'range',
@@ -52,7 +49,6 @@ void main() async {
   //       name: 'roundrobin',
   //       metadata: ProtocolMetadata(version: 0, topics: ['test-topic']))
   // ];
-
   // await consumer.sendJoinGroupRequest(
   //     apiVersion: 0,
   //     groupId: 'nyarlathotep',
@@ -67,12 +63,10 @@ void main() async {
 
   // TESTING THE PRODUCER COMMANDS
   KafkaProducer producer = KafkaProducer(kafka: kafka);
-
   List<Topic> topics = List.empty(growable: true);
   List<Partition> partitions = List.empty(growable: true);
   List<Record> records = List.empty(growable: true);
   List<RecordHeader> headers = List.empty(growable: true);
-
   records.add(Record(
       attributes: 0,
       timestampDelta: 0,
@@ -81,7 +75,6 @@ void main() async {
       value: 'valoooor',
       headers: headers,
       timestamp: DateTime.now().millisecondsSinceEpoch));
-
   RecordBatch batch = RecordBatch(
     attributes: 0,
     baseOffset: 0,
@@ -90,11 +83,10 @@ void main() async {
     magic: 2,
     records: records,
   );
-
   partitions.add(Partition(partitionId: 0, logStartOffset: 0, batch: batch));
   topics.add(Topic(topicName: 'test-topic', partitions: partitions));
   await producer.produce(
-      acks: 0, timeoutMs: 30000, topics: topics, apiVersion: 7);
+      acks: 0, timeoutMs: 30000, topics: topics, apiVersion: 11);
 
   return;
   // await kafka.close();

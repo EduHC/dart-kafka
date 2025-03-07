@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dart_kafka/src/models/partition.dart';
@@ -9,51 +10,65 @@ class KafkaProduceApi {
   final int apiKey = PRODUCE; // ProduceRequest API key
   final Utils utils = Utils();
 
-  /// Serialize the ProduceRequest (Version 11)
+  /// Serialize the ProduceRequest
   Uint8List serialize(
       {required int correlationId,
       String? transactionalId,
       required int acks,
       required int timeoutMs,
       required List<Topic> topics,
-      int? apiVersion}) {
+      int? apiVersion,
+      String? clientId}) {
     final byteBuffer = BytesBuilder();
 
     byteBuffer.add(utils.int16(apiKey));
     byteBuffer.add(utils.int16(apiVersion ?? 7));
     byteBuffer.add(utils.int32(correlationId));
+    byteBuffer.add(utils.nullableString(clientId));
+    byteBuffer.addByte(0); // tagged_field
 
-    byteBuffer.add(utils.nullableString(transactionalId));
+    // byteBuffer.add(utils.nullableString(transactionalId));
+    byteBuffer.add(utils.compactNullableString(transactionalId));
     byteBuffer.add(utils.int16(acks));
     byteBuffer.add(utils.int32(timeoutMs));
-    byteBuffer.add(utils.int32(topics.length));
+    // byteBuffer.add(utils.int32(topics.length));
+    byteBuffer.add(utils.compactArrayLength(topics.length));
 
     for (final topic in topics) {
-      byteBuffer.add(utils.string(topic.topicName));
-      byteBuffer.add(utils.int32(topic.partitions.length));
+      byteBuffer.add(utils.compactString(topic.topicName));
+      // byteBuffer.add(utils.int32(topic.partitions.length));
+      byteBuffer.add(utils.compactArrayLength(topic.partitions.length));
 
       for (Partition partition in topic.partitions) {
-        if (partition.batch == null) {
-          throw Exception(
-              "The partition ${partition.partitionId} doesn't have the RecordBatch to send "
-              "but it was included in the topic do be sent");
-        }
-
-        if (partition.batch!.records == null) {
-          throw Exception(
-              "The RecordBatch of the partition ${partition.partitionId} doesn't have the  "
-              "but it was included in the topic do be sent");
-        }
-
         byteBuffer.add(utils.int32(partition.partitionId));
-        byteBuffer.add(utils.records(partition.batch!.records!));
+
+        if (partition.batch == null || partition.batch!.records == null) {
+          final message = byteBuffer.toBytes();
+          byteBuffer.clear();
+
+          return Uint8List.fromList(
+              [...utils.int32(message.length), ...message]);
+        }
+
+        // if (partition.batch == null) {
+        //   throw Exception(
+        //       "The partition ${partition.partitionId} doesn't have the RecordBatch to send "
+        //       "but it was included in the topic do be sent");
+        // }
+
+        // if (partition.batch!.records == null) {
+        //   throw Exception(
+        //       "The RecordBatch of the partition ${partition.partitionId} doesn't have the  "
+        //       "but it was included in the topic do be sent");
+        // }
+
+        byteBuffer.add(utils.recordBatch(partition.batch!.records!));
       }
     }
 
-    // byteBuffer.add(utils.tagBuffer());
+    final message = byteBuffer.toBytes();
+    byteBuffer.clear();
 
-    final message = Uint8List.fromList(
-        [...utils.int32(byteBuffer.toBytes().length), ...byteBuffer.toBytes()]);
     return Uint8List.fromList([...utils.int32(message.length), ...message]);
   }
 

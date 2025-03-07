@@ -1,6 +1,7 @@
 services:
   kafka-controller-1:
-    image: apache/kafka:3.8.0-rc2
+    # image: apache/kafka:3.8.0-rc2
+    image: apache/kafka:latest
     container_name: kafka-controller-1
     environment:
       KAFKA_NODE_ID: 1
@@ -37,7 +38,8 @@ services:
   #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:9093,2@kafka-controller-2:9094,3@kafka-controller-3:9095
   
   kafka-broker-1:
-    image: apache/kafka:3.8.0-rc2
+    # image: apache/kafka:3.8.0-rc2
+    image: apache/kafka:latest
     container_name: kafka-broker-1
     ports:
       - 29092:9090
@@ -55,6 +57,7 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:9093
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 5
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR : 1
+      # KAFKA_REPLICA_SOCKET_RECEIVE_BUFFER_BYTES: 0
     depends_on:
       - kafka-controller-1
       # - kafka-controller-2

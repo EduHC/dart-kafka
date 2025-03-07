@@ -43,8 +43,8 @@ class ResponseController {
     }
 
     final byteData = ByteData.sublistView(response);
-
     MessageHeader header = _extractMessageHeader(response);
+    print("Response Received: $response");
 
     if (!_pendingRequests.containsKey(header.correlationId)) {
       _pendingResponses.addAll({
