@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/topic.dart';
 import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/protocol/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaProduceApi {
@@ -19,7 +19,7 @@ class KafkaProduceApi {
       required List<Topic> topics,
       int? apiVersion,
       String? clientId}) {
-    final byteBuffer = BytesBuilder();
+    BytesBuilder byteBuffer = BytesBuilder();
 
     byteBuffer.add(utils.int16(apiKey));
     byteBuffer.add(utils.int16(apiVersion ?? 7));
@@ -35,36 +35,35 @@ class KafkaProduceApi {
     byteBuffer.add(utils.compactArrayLength(topics.length));
 
     for (final topic in topics) {
+      // byteBuffer.add(utils.string(topic.topicName));
       byteBuffer.add(utils.compactString(topic.topicName));
-      // byteBuffer.add(utils.int32(topic.partitions.length));
-      byteBuffer.add(utils.compactArrayLength(topic.partitions.length));
+      // byteBuffer.add(utils.int32(topic.partitions?.length ?? 0));
+      byteBuffer.add(utils.compactArrayLength(topic.partitions?.length ?? 0));
 
-      for (Partition partition in topic.partitions) {
-        byteBuffer.add(utils.int32(partition.partitionId));
-
-        if (partition.batch == null || partition.batch!.records == null) {
-          final message = byteBuffer.toBytes();
-          byteBuffer.clear();
-
-          return Uint8List.fromList(
-              [...utils.int32(message.length), ...message]);
+      for (Partition partition in topic.partitions ?? []) {
+        if (partition.batch == null) {
+          throw Exception(
+              "The partition ${partition.partitionId} has a null batch.");
         }
 
-        // if (partition.batch == null) {
-        //   throw Exception(
-        //       "The partition ${partition.partitionId} doesn't have the RecordBatch to send "
-        //       "but it was included in the topic do be sent");
-        // }
+        if (partition.batch!.records == null) {
+          throw Exception(
+              "The batch of the partition ${partition.partitionId} has null records");
+        }
 
-        // if (partition.batch!.records == null) {
-        //   throw Exception(
-        //       "The RecordBatch of the partition ${partition.partitionId} doesn't have the  "
-        //       "but it was included in the topic do be sent");
-        // }
-
-        byteBuffer.add(utils.recordBatch(partition.batch!.records!));
+        byteBuffer.add(utils.int32(partition.partitionId));
+        final Uint8List recordBatch =
+            utils.recordBatch(partition.batch!.records!);
+        byteBuffer = utils.writeUnsignedVarint(recordBatch.length + 1,
+            byteBuffer); // adding the size of the RecordBatch
+        byteBuffer.add(recordBatch);
       }
     }
+
+    // Adding the _tagged_fields
+    byteBuffer.addByte(0);
+    byteBuffer.addByte(0);
+    byteBuffer.addByte(0);
 
     final message = byteBuffer.toBytes();
     byteBuffer.clear();
@@ -72,50 +71,69 @@ class KafkaProduceApi {
     return Uint8List.fromList([...utils.int32(message.length), ...message]);
   }
 
-  /// Deserialize the ProduceResponse (Version 11)
+  /// Deserialize the ProduceResponse
   dynamic deserialize(Uint8List data, int apiVersion) {
     final buffer = ByteData.sublistView(data);
-    int offset = 0;
+    int offset = 1; // ignore the tagged_buffer
 
     // Read responses array
-    final responsesLength = buffer.getInt32(offset);
-    offset += 4;
+    final result = utils.readCompactArrayLength(buffer, offset);
+    final responsesLength = result.value;
+    offset += result.bytesRead;
 
     final responses = <Map<String, dynamic>>[];
     for (int i = 0; i < responsesLength; i++) {
-      // Read topic name (STRING)
-      final topic = utils.readString(buffer, offset);
+      final topic = utils.readCompactString(buffer, offset);
+      final String topicName = topic.value;
       offset += topic.bytesRead;
 
       // Read partition_responses array
-      final partitionResponsesLength = buffer.getInt32(offset);
-      offset += 4;
+      final partitions = utils.readCompactArrayLength(buffer, offset);
+      final partitionResponsesLength = partitions.value;
+      offset += partitions.bytesRead;
 
       final partitionResponses = <Map<String, dynamic>>[];
       for (int j = 0; j < partitionResponsesLength; j++) {
-        // Read partition (INT32)
         final partition = buffer.getInt32(offset);
         offset += 4;
-
-        // Read error_code (INT16)
         final errorCode = buffer.getInt16(offset);
         offset += 2;
-
-        // Read base_offset (INT64)
         final baseOffset = buffer.getInt64(offset);
         offset += 8;
-
-        // Read log_append_time (INT64)
         final logAppendTime = buffer.getInt64(offset);
         offset += 8;
-
-        // Read log_start_offset (INT64)
         final logStartOffset = buffer.getInt64(offset);
         offset += 8;
 
+        final errors = utils.readCompactArrayLength(buffer, offset);
+        offset += errors.bytesRead;
+
+        final errorResponses = <Map<int, String?>>[];
+        for (int k = 0; k < errors.value; k++) {
+          final int batchIndex = buffer.getInt32(offset);
+          final batchErrorIndex =
+              utils.readCompactNullableString(buffer, offset);
+          offset += batchErrorIndex.bytesRead;
+          final int taggedFields = buffer.getInt8(offset);
+
+          errorResponses.add({batchIndex: batchErrorIndex.value});
+        }
+
+        final errorMessage = utils.readCompactNullableString(buffer, offset);
+        offset += errorMessage.bytesRead;
+        final int taggedFields1 = buffer.getInt8(offset);
+        offset += 1;
+        final int taggedFields2 = buffer.getInt8(offset);
+        offset += 1;
+        final int throttleTimeMs = buffer.getInt32(offset);
+        offset += 4;
+        final int taggedFields3 = buffer.getInt8(offset);
+        offset += 1;
+
         partitionResponses.add({
           'partition': partition,
-          'error_code': errorCode,
+          'error': {'code': errorCode, 'message': ERROR_MAP[errorCode]},
+          'error_msg': errorMessage.value,
           'base_offset': baseOffset,
           'log_append_time': logAppendTime,
           'log_start_offset': logStartOffset,
@@ -128,9 +146,12 @@ class KafkaProduceApi {
       });
     }
 
-    // Read throttle_time_ms (INT32)
-    final throttleTimeMs = buffer.getInt32(offset);
-    offset += 4;
+    var throttleTimeMs;
+
+    if (utils.canRead(currentOffset: offset, amountOfBytes: 4, data: data)) {
+      throttleTimeMs = buffer.getInt32(offset);
+      offset += 4;
+    }
 
     // Read TAG_BUFFER (empty for now)
     utils.readTagBuffer(buffer, offset);

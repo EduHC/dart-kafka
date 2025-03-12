@@ -12,7 +12,9 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT
       # KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:9093,2@kafka-controller-2:9094,3@kafka-controller-3:9095
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:9093
-
+      LOG4J_LOGGER_KAFKA: 'warn'
+      LOG4J_LOGGER_ORG_APACHE_KAFKA: 'warn'
+      
   # kafka-controller-2:
   #   image: apache/kafka:latest
   #   container_name: kafka-controller-2
@@ -58,6 +60,8 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 5
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR : 1
       # KAFKA_REPLICA_SOCKET_RECEIVE_BUFFER_BYTES: 0
+      LOG4J_LOGGER_KAFKA: 'warn'
+      LOG4J_LOGGER_ORG_APACHE_KAFKA: 'warn'
     depends_on:
       - kafka-controller-1
       # - kafka-controller-2
@@ -135,3 +139,21 @@ services:
 #       name: kafka_default
 #       external: true
  
+  wireshark:
+    image: lscr.io/linuxserver/wireshark:latest
+    container_name: wireshark
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - seccomp:unconfined #optional
+    # network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /path/to/wireshark/config:/config
+    ports:
+      - 3000:3000 #optional
+      - 3001:3001 #optional
+    restart: unless-stopped

@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:ffi';
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:dart_kafka/src/models/components/record.dart';
+import 'package:dart_kafka/src/models/components/record_header.dart';
 import 'package:dart_kafka/src/protocol/crc32.dart';
 
 class Utils {
@@ -15,9 +18,21 @@ class Utils {
     return data.buffer.asUint8List();
   }
 
+  Uint8List uint8(int value) {
+    ByteData data = ByteData(1);
+    data.setUint8(0, value);
+    return data.buffer.asUint8List();
+  }
+
   Uint8List int16(int value) {
     final data = ByteData(2);
     data.setInt16(0, value, Endian.big);
+    return data.buffer.asUint8List();
+  }
+
+  Uint8List uint16(int value) {
+    ByteData data = ByteData(2);
+    data.setUint16(0, value);
     return data.buffer.asUint8List();
   }
 
@@ -39,24 +54,72 @@ class Utils {
     return data.buffer.asUint8List();
   }
 
-  Uint8List varInt(int value) {
-    final buffer = BytesBuilder();
-    while ((value & ~0x7F) != 0) {
-      buffer.addByte((value & 0x7F) | 0x80);
-      value >>= 7;
-    }
-    buffer.addByte(value);
-    return buffer.toBytes();
+  Uint8List uint64(int value) {
+    ByteData data = ByteData(8);
+    data.setUint64(0, value);
+    return data.buffer.asUint8List();
   }
 
-  Uint8List varLong(int value) {
-    final buffer = BytesBuilder();
-    while ((value & ~0x7F) != 0) {
-      buffer.addByte((value & 0x7F) | 0x80);
-      value >>>= 7; // Use unsigned right shift
+  // Uint8List varint(int value) {
+  //   final buffer = BytesBuilder();
+  //   while ((value & ~0x7F) != 0) {
+  //     buffer.addByte((value & 0x7F) | 0x80);
+  //     value >>= 7;
+  //   }
+  //   buffer.addByte(value);
+  //   return buffer.toBytes();
+  // }
+
+  BytesBuilder writeVarint(int value, BytesBuilder buffer) {
+    return writeUnsignedVarint((value << 1) ^ (value >> 31), buffer);
+    // return writeUnsignedVarint(value, buffer);
+  }
+
+  BytesBuilder writeUnsignedVarint(int value, BytesBuilder buffer) {
+    if ((value & (0xFFFFFFFF << 7)) == 0) {
+      buffer.add(uint8(value));
+    } else {
+      buffer.add((uint8((value & 0x7F) | 0x80)));
+      if ((value & (0xFFFFFFFF << 14)) == 0) {
+        buffer.add(uint8(value >>> 7));
+      } else {
+        buffer.add(uint8((value >>> 7) & 0x7F | 0x80));
+        if ((value & (0xFFFFFFFF << 21)) == 0) {
+          buffer.add(uint8(value >>> 14));
+        } else {
+          buffer.add(uint8((value >>> 14) & 0x7F | 0x80));
+          if ((value & (0xFFFFFFFF << 28)) == 0) {
+            buffer.add(uint8(value >>> 21));
+          } else {
+            buffer.add(uint8((value >>> 21) & 0x7F | 0x80));
+            buffer.add(uint8(value >>> 28));
+          }
+        }
+      }
     }
-    buffer.addByte(value);
-    return buffer.toBytes();
+
+    return buffer;
+  }
+
+  BytesBuilder writeVarlong(int value, BytesBuilder buffer) {
+    return writeUnsignedVarlong((value << 1) ^ (value >> 63), buffer);
+  }
+
+  BytesBuilder writeUnsignedVarlong(int value, BytesBuilder buffer) {
+    ByteData? data = ByteData(1);
+    int? offset = 0;
+    while ((value & 0xffffffffffffff80) != 0) {
+      final byte = (value & 0x7f) | 0x80;
+      data.setUint8(offset!, byte);
+      offset++;
+      value >>>= 7;
+    }
+    data.setInt8(offset!, value);
+    buffer.add(data.buffer.asUint8List());
+
+    offset = null;
+    data = null;
+    return buffer;
   }
 
   Uint8List string(String value) {
@@ -90,7 +153,7 @@ class Utils {
   }
 
   Uint8List compactArrayLength(int length) {
-    return encodeUnsignedVarint(length < 0 ? 0 : length + 1);
+    return encodeUnsignedVarint(length <= 0 ? 0 : length + 1);
   }
 
   Uint8List tagBuffer() {
@@ -104,50 +167,77 @@ class Utils {
     batchBuffer.add(int32(0)); // lastOffsetDelta
     batchBuffer.add(int64(records.first.timestamp)); // BaseTimestamp
     batchBuffer.add(int64(records.last.timestamp)); // maxTimestamp
-    batchBuffer.add(int64(0)); // ProducerId || mandando como 0
+    batchBuffer.add(int64(1000)); // ProducerId ||
     batchBuffer.add(int16(0)); // ProducerEpoch
     batchBuffer.add(int32(0)); // BaseSequence
-    batchBuffer.add(compactArrayLength(records.length));
+    batchBuffer.add(int32(records.length));
 
     // Encode each record
     for (var record in records) {
       BytesBuilder recordBuffer = BytesBuilder();
 
       recordBuffer.addByte(0); // Attributes
-      recordBuffer.add(varLong(record.timestamp - records.first.timestamp)); // timestampDelta
-      recordBuffer.add(varInt(records.indexOf(record))); // offsetDelta
+      recordBuffer = writeVarlong(record.timestamp - records.first.timestamp,
+          recordBuffer); // timestampDelta
+      recordBuffer =
+          writeVarint(records.indexOf(record), recordBuffer); // OffsetDelta
 
-      if (record.key != null) {
-        recordBuffer.add(varInt(record.key!.length));
-        recordBuffer.add(utf8.encode(record.key!)); // testar colocar ut8.encode
+      if (record.key == null) {
+        recordBuffer = writeVarint(-1, recordBuffer);
       } else {
-        recordBuffer.add(varInt(0));
+        final Uint8List keyBytes = utf8.encode(record.key!);
+        recordBuffer = writeVarint(keyBytes.length, recordBuffer);
+        recordBuffer.add(keyBytes);
       }
 
-      if (record.value != null) {
-        recordBuffer.add(varInt(record.value!.length));
-        recordBuffer.add(utf8.encode(record.value!)); // testar colocar ut8.encode
+      if (record.value == null) {
+        recordBuffer = writeVarint(-1, recordBuffer);
       } else {
-        recordBuffer.add(varInt(0));
+        final Uint8List valueBytes = utf8.encode(record.value!);
+        recordBuffer = writeVarint(valueBytes.length, recordBuffer);
+        recordBuffer.add(valueBytes);
       }
 
-      recordBuffer.add(compactArrayLength(record.headers?.length ?? 0));
+      recordBuffer = writeVarint(record.headers?.length ?? 0, recordBuffer);
       for (var header in record.headers ?? []) {
-        recordBuffer.add(varInt(header.headerKey.length));
-        recordBuffer.add(header.headerKey.codeUnits);
-        recordBuffer.add(varInt(header.headerValue.length));
-        recordBuffer.add(header.headerValue.codeUnits);
+        if (header.key == null) {
+          throw Exception("Invalid null header key found!");
+        }
+        Uint8List bytes = utf8.encode(header.key!);
+        recordBuffer = writeVarint(bytes.length, recordBuffer);
+        recordBuffer.add(bytes);
+
+        if (header.value == null) {
+          recordBuffer = writeVarint(-1, recordBuffer);
+        } else {
+          bytes = utf8.encode(header.value);
+          recordBuffer = writeVarint(bytes.length, recordBuffer);
+          recordBuffer.add(bytes);
+        }
       }
 
-      batchBuffer
-          .add([...varInt(recordBuffer.length), ...recordBuffer.toBytes()]);
+      // add the Varint length of the record
+      batchBuffer = writeVarint(
+          recordSizeOfBodyInBytes(
+              headers: record.headers ?? [],
+              offsetDelta: 0,
+              timestampDelta: 0,
+              key: record.key == null ? null : utf8.encode(record.key!),
+              value: record.value == null ? null : utf8.encode(record.value!)),
+          batchBuffer);
+
+      batchBuffer.add([...recordBuffer.toBytes()]);
     }
 
     Uint8List message = batchBuffer.toBytes();
 
-    // Add the PartitionLeaderEpoch, magic, Checksum and 3 more null tagged_fields
-    message = Uint8List.fromList(
-        [...int32(0), ...int8(2), ...uint32(crc32c(message)), ...message]);
+    // Add the PartitionLeaderEpoch, magic, Checksum
+    message = Uint8List.fromList([
+      ...int32(-1),
+      ...int8(2),
+      ...uint32(crc32c(message)),
+      ...message,
+    ]);
     batchBuffer.clear();
 
     // Add the BatchOffset and BatchLength
@@ -308,5 +398,107 @@ class Utils {
     final value =
         String.fromCharCodes(buffer.buffer.asUint8List(offset, length));
     return (value: value, bytesRead: length + 2);
+  }
+
+  int recordSizeOfBodyInBytes(
+      {required int offsetDelta,
+      required int timestampDelta,
+      Uint8List? key,
+      Uint8List? value,
+      required List<RecordHeader> headers}) {
+    int keySize = key == null ? -1 : key.length;
+    int valueSize = value == null ? -1 : value.length;
+
+    return recordSizeOfBodyInBytes0(
+        offsetDelta, timestampDelta, keySize, valueSize, headers);
+  }
+
+  int recordSizeOfBodyInBytes0(int offsetDelta, int timestampDelta, int keySize,
+      int valueSize, List<RecordHeader> headers) {
+    int size = 1; // 1 for the Attributes
+    size += sizeOfVarint(offsetDelta);
+    size += sizeOfVarlong(timestampDelta);
+    size += _sizeOfRecordPart(
+        keySize: keySize, valueSize: valueSize, headers: headers);
+    return size;
+  }
+
+  int sizeOfVarint(int value) {
+    return sizeOfUnsignedVarint((value << 1) ^ (value >> 31));
+  }
+
+  int sizeOfUnsignedVarint(int value) {
+    int leadingZeros = (value == 0) ? 32 : (32 - value.bitLength);
+
+    // 74899 is equal to the byte-value 0b10010010010010011 in Java -- used by Apache Kafka.
+    int leadingZerosBelow38DividedBy7 = ((38 - leadingZeros) * 74899) >>> 19;
+    return leadingZerosBelow38DividedBy7 + (leadingZeros >>> 5);
+  }
+
+  int sizeOfVarlong(int value) {
+    return sizeOfUnsignedVarlong((value << 1) ^ (value >> 63));
+  }
+
+  int sizeOfUnsignedVarlong(int value) {
+    int leadingZeros = (value == 0) ? 64 : (64 - value.bitLength);
+
+    // 74899 is equal to the byte-value 0b10010010010010011 in Java -- used by Apache Kafka.
+    int leadingZerosBelow38DividedBy7 = ((70 - leadingZeros) * 74899) >>> 19;
+    return leadingZerosBelow38DividedBy7 + (leadingZeros >>> 6);
+  }
+
+  int _sizeOfRecordPart(
+      {required int keySize,
+      required int valueSize,
+      required List<RecordHeader> headers}) {
+    int size = 0;
+
+    if (keySize < 0) {
+      size += sizeOfVarint(-1);
+    } else {
+      size += sizeOfVarint(keySize) + keySize;
+    }
+
+    if (valueSize < 0) {
+      size += sizeOfVarint(-1);
+    } else {
+      size += sizeOfVarint(valueSize) + valueSize;
+    }
+
+    size += sizeOfVarint(headers.length);
+    for (RecordHeader header in headers) {
+      if (header.headerKey == null) {
+        throw Exception("Invalid null header key found in headers");
+      }
+
+      int headerKeySize = utf8Length(header.headerKey);
+      size += sizeOfVarint(headerKeySize) + headerKeySize;
+
+      if (header.headerValue == null) {
+        size += sizeOfVarint(-1);
+      } else {
+        int headerValueSize = utf8Length(header.headerValue);
+        size += sizeOfVarint(headerValueSize) + headerValueSize;
+      }
+    }
+    return size;
+  }
+
+  int utf8Length(String s) {
+    int count = 0;
+
+    for (final int rune in s.runes) {
+      if (rune <= 0x7F) {
+        count++;
+      } else if (rune <= 0x7FF) {
+        count += 2;
+      } else if (rune <= 0xFFFF) {
+        count += 3;
+      } else {
+        // Code points above 0xFFFF are encoded as four bytes in UTF-8.
+        count += 4;
+      }
+    }
+    return count;
   }
 }

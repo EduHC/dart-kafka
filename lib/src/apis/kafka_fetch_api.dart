@@ -61,8 +61,8 @@ class KafkaFetchApi {
       byteBuffer.add(utils.int16(topicNameBytes.length));
       byteBuffer.add(topicNameBytes);
 
-      byteBuffer.add(utils.int32(topic.partitions.length));
-      for (final partition in topic.partitions) {
+      byteBuffer.add(utils.int32(topic.partitions!.length));
+      for (final partition in topic.partitions!) {
         byteBuffer.add(utils.int32(partition.partitionId));
         byteBuffer.add(utils.int64(partition.fetchOffset ?? 0));
         byteBuffer.add(utils.int64(partition

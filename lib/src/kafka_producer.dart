@@ -17,6 +17,7 @@ class KafkaProducer {
     int? correlationId,
     int? apiVersion,
     String? transactionalId,
+    String? clientId,
     required int acks,
     required int timeoutMs,
     required List<Topic> topics,
@@ -33,7 +34,8 @@ class KafkaProducer {
         timeoutMs: timeoutMs,
         topics: topics,
         apiVersion: apiVersion,
-        transactionalId: transactionalId);
+        transactionalId: transactionalId,
+        clientId: clientId);
 
     print("${DateTime.now()} || [APP] ProduceRequest: $message");
     server.add(message);

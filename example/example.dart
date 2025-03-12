@@ -63,6 +63,7 @@ void main() async {
 
   // TESTING THE PRODUCER COMMANDS
   KafkaProducer producer = KafkaProducer(kafka: kafka);
+
   List<Topic> topics = List.empty(growable: true);
   List<Partition> partitions = List.empty(growable: true);
   List<Record> records = List.empty(growable: true);
@@ -71,11 +72,13 @@ void main() async {
       attributes: 0,
       timestampDelta: 0,
       offsetDelta: 0,
-      key: 'chave',
-      value: 'valoooor',
+      key: null,
+      value: 'sentbycli',
       headers: headers,
       timestamp: DateTime.now().millisecondsSinceEpoch));
   RecordBatch batch = RecordBatch(
+    producerId: 1000,
+    partitionLeaderEpoch: -1,
     attributes: 0,
     baseOffset: 0,
     lastOffsetDelta: 0,
@@ -86,8 +89,11 @@ void main() async {
   partitions.add(Partition(partitionId: 0, logStartOffset: 0, batch: batch));
   topics.add(Topic(topicName: 'test-topic', partitions: partitions));
   await producer.produce(
-      acks: 0, timeoutMs: 30000, topics: topics, apiVersion: 11);
-
+      acks: -1,
+      timeoutMs: 30000,
+      topics: topics,
+      apiVersion: 11,
+      clientId: 'console-producer',
+      correlationId: 8);
   return;
-  // await kafka.close();
 }
