@@ -10,6 +10,9 @@ class ResponseController {
   final Queue _messageQueue = Queue<List<int>>();
   bool isDraining = false;
 
+  bool get hasPendingProcesses =>
+      _pendingRequests.isNotEmpty || _pendingResponses.isNotEmpty;
+
   void enqueue(Uint8List messages) {
     final byteData = ByteData.sublistView(messages);
     int offset = 0;

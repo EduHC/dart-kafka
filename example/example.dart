@@ -72,12 +72,12 @@ void main() async {
       attributes: 0,
       timestampDelta: 0,
       offsetDelta: 0,
-      key: null,
-      value: 'sentbycli',
+      key: 'key',
+      value: '{\'kartoffell\': \'potato\'}',
       headers: headers,
       timestamp: DateTime.now().millisecondsSinceEpoch));
   RecordBatch batch = RecordBatch(
-    producerId: 1000,
+    producerId: 0,
     partitionLeaderEpoch: -1,
     attributes: 0,
     baseOffset: 0,
@@ -87,13 +87,16 @@ void main() async {
     records: records,
   );
   partitions.add(Partition(partitionId: 0, logStartOffset: 0, batch: batch));
-  topics.add(Topic(topicName: 'test-topic', partitions: partitions));
+  topics.add(Topic(topicName: 'cthulhu', partitions: partitions));
   await producer.produce(
       acks: -1,
       timeoutMs: 30000,
       topics: topics,
       apiVersion: 11,
-      clientId: 'console-producer',
-      correlationId: 8);
+      clientId: 'dart-kafka',
+      correlationId: null,
+      transactionalId: null);
+
+  await kafka.close();
   return;
 }

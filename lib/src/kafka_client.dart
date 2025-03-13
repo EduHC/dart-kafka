@@ -6,11 +6,11 @@ import 'package:dart_kafka/src/protocol/response_controller.dart';
 import 'package:dart_kafka/src/typedefs/types.dart';
 
 class KafkaClient {
-  late final Socket? _socket;
+  late Socket? _socket;
   final String host;
   final int port;
   final ResponseController responseController = ResponseController();
-  late final StreamSubscription? _subscription;
+  late StreamSubscription? _subscription;
 
   Socket? get server => _socket;
 
@@ -20,18 +20,25 @@ class KafkaClient {
     _socket = await Socket.connect(host, port);
     if (_socket == null) throw Exception("Server hasn't connected");
 
+    _socket!.setOption(SocketOption.tcpNoDelay, true);
     Future.microtask(() {
-      _subscription = _socket.listen(
+      _subscription = _socket!.listen(
         (event) => _handleResponse(event),
       );
     });
   }
 
   Future<void> close() async {
-    _socket?.close();
+    while (hasPendingProcesses()) {
+      await Future.delayed(Duration(seconds: 1));
+      continue;
+    }
+    print("Fechou");
     _subscription?.cancel();
-    _socket = null;
+    _socket?.close();
+    _socket?.destroy();
     _subscription = null;
+    _socket = null;
   }
 
   void _handleResponse(Uint8List response) {
@@ -51,5 +58,9 @@ class KafkaClient {
 
   void completeRequest({required int correlationId}) {
     responseController.completeRequest(correlationId: correlationId);
+  }
+
+  bool hasPendingProcesses() {
+    return responseController.hasPendingProcesses;
   }
 }
