@@ -60,39 +60,28 @@ class Utils {
     return data.buffer.asUint8List();
   }
 
-  // Uint8List varint(int value) {
-  //   final buffer = BytesBuilder();
-  //   while ((value & ~0x7F) != 0) {
-  //     buffer.addByte((value & 0x7F) | 0x80);
-  //     value >>= 7;
-  //   }
-  //   buffer.addByte(value);
-  //   return buffer.toBytes();
-  // }
-
   BytesBuilder writeVarint(int value, BytesBuilder buffer) {
     return writeUnsignedVarint((value << 1) ^ (value >> 31), buffer);
-    // return writeUnsignedVarint(value, buffer);
   }
 
   BytesBuilder writeUnsignedVarint(int value, BytesBuilder buffer) {
     if ((value & (0xFFFFFFFF << 7)) == 0) {
       buffer.add(uint8(value));
     } else {
-      buffer.add((uint8((value & 0x7F) | 0x80)));
+      buffer.add((uint8(value & 0x7F | 0x80)));
       if ((value & (0xFFFFFFFF << 14)) == 0) {
-        buffer.add(uint8(value >>> 7));
+        buffer.add(uint8((value >>> 7) & 0xFF));
       } else {
         buffer.add(uint8((value >>> 7) & 0x7F | 0x80));
         if ((value & (0xFFFFFFFF << 21)) == 0) {
-          buffer.add(uint8(value >>> 14));
+          buffer.add(uint8((value >>> 14)  & 0xFF));
         } else {
           buffer.add(uint8((value >>> 14) & 0x7F | 0x80));
           if ((value & (0xFFFFFFFF << 28)) == 0) {
-            buffer.add(uint8(value >>> 21));
+            buffer.add(uint8((value >>> 21)  & 0xFF));
           } else {
             buffer.add(uint8((value >>> 21) & 0x7F | 0x80));
-            buffer.add(uint8(value >>> 28));
+            buffer.add(uint8((value >>> 28) & 0xFF));
           }
         }
       }
@@ -158,91 +147,6 @@ class Utils {
 
   Uint8List tagBuffer() {
     return Uint8List(0);
-  }
-
-  Uint8List recordBatch(List<Record> records) {
-    BytesBuilder batchBuffer = BytesBuilder();
-
-    batchBuffer.add(int16(0)); // attributes
-    batchBuffer.add(int32(0)); // lastOffsetDelta
-    batchBuffer.add(int64(records.first.timestamp)); // BaseTimestamp
-    batchBuffer.add(int64(records.last.timestamp)); // maxTimestamp
-    batchBuffer.add(int64(1000)); // ProducerId ||
-    batchBuffer.add(int16(0)); // ProducerEpoch
-    batchBuffer.add(int32(0)); // BaseSequence
-    batchBuffer.add(int32(records.length));
-
-    // Encode each record
-    for (var record in records) {
-      BytesBuilder recordBuffer = BytesBuilder();
-
-      recordBuffer.addByte(0); // Attributes
-      recordBuffer = writeVarlong(record.timestamp - records.first.timestamp,
-          recordBuffer); // timestampDelta
-      recordBuffer =
-          writeVarint(records.indexOf(record), recordBuffer); // OffsetDelta
-
-      if (record.key == null) {
-        recordBuffer = writeVarint(-1, recordBuffer);
-      } else {
-        final Uint8List keyBytes = utf8.encode(record.key!);
-        recordBuffer = writeVarint(keyBytes.length, recordBuffer);
-        recordBuffer.add(keyBytes);
-      }
-
-      if (record.value == null) {
-        recordBuffer = writeVarint(-1, recordBuffer);
-      } else {
-        final Uint8List valueBytes = utf8.encode(record.value!);
-        recordBuffer = writeVarint(valueBytes.length, recordBuffer);
-        recordBuffer.add(valueBytes);
-      }
-
-      recordBuffer = writeVarint(record.headers?.length ?? 0, recordBuffer);
-      for (var header in record.headers ?? []) {
-        if (header.key == null) {
-          throw Exception("Invalid null header key found!");
-        }
-        Uint8List bytes = utf8.encode(header.key!);
-        recordBuffer = writeVarint(bytes.length, recordBuffer);
-        recordBuffer.add(bytes);
-
-        if (header.value == null) {
-          recordBuffer = writeVarint(-1, recordBuffer);
-        } else {
-          bytes = utf8.encode(header.value);
-          recordBuffer = writeVarint(bytes.length, recordBuffer);
-          recordBuffer.add(bytes);
-        }
-      }
-
-      // add the Varint length of the record
-      batchBuffer = writeVarint(
-          recordSizeOfBodyInBytes(
-              headers: record.headers ?? [],
-              offsetDelta: 0,
-              timestampDelta: 0,
-              key: record.key == null ? null : utf8.encode(record.key!),
-              value: record.value == null ? null : utf8.encode(record.value!)),
-          batchBuffer);
-
-      batchBuffer.add([...recordBuffer.toBytes()]);
-    }
-
-    Uint8List message = batchBuffer.toBytes();
-
-    // Add the PartitionLeaderEpoch, magic, Checksum
-    message = Uint8List.fromList([
-      ...int32(-1),
-      ...int8(2),
-      ...uint32(crc32c(message)),
-      ...message,
-    ]);
-    batchBuffer.clear();
-
-    // Add the BatchOffset and BatchLength
-    return Uint8List.fromList(
-        [...int64(0), ...int32(message.length), ...message]);
   }
 
   /// Generate a random CorrelationID
@@ -467,17 +371,17 @@ class Utils {
 
     size += sizeOfVarint(headers.length);
     for (RecordHeader header in headers) {
-      if (header.headerKey == null) {
+      if (header.key == null) {
         throw Exception("Invalid null header key found in headers");
       }
 
-      int headerKeySize = utf8Length(header.headerKey);
+      int headerKeySize = utf8Length(header.key);
       size += sizeOfVarint(headerKeySize) + headerKeySize;
 
-      if (header.headerValue == null) {
+      if (header.value == null) {
         size += sizeOfVarint(-1);
       } else {
-        int headerValueSize = utf8Length(header.headerValue);
+        int headerValueSize = utf8Length(header.value);
         size += sizeOfVarint(headerValueSize) + headerValueSize;
       }
     }
@@ -501,4 +405,8 @@ class Utils {
     }
     return count;
   }
+
+  
 }
+
+

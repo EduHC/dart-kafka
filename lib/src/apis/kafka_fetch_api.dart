@@ -320,10 +320,8 @@ class KafkaFetchApi {
         offset += headerValueLength;
 
         headers.add(RecordHeader(
-          headerKey: headerKey,
-          headerKeyLength: headerKeyLength,
-          headerValue: headerValue,
-          headerValueLength: headerValueLength,
+          key: headerKey,
+          value: headerValue,
         ));
       }
 

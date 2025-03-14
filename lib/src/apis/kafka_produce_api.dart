@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/topic.dart';
 import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
@@ -17,28 +18,41 @@ class KafkaProduceApi {
       required int acks,
       required int timeoutMs,
       required List<Topic> topics,
-      int? apiVersion,
-      String? clientId}) {
+      int apiVersion = 11,
+      String? clientId,
+      required int producerId,
+      required int attributes,
+      required int lastOffsetDelta,
+      required int producerEpoch,
+      required int baseSequence,
+      required int batchOffset,
+      required int partitionLeaderEpoch}) {
     BytesBuilder byteBuffer = BytesBuilder();
+    Encoder encoder = Encoder();
 
-    byteBuffer.add(utils.int16(apiKey));
-    byteBuffer.add(utils.int16(apiVersion ?? 7));
-    byteBuffer.add(utils.int32(correlationId));
-    byteBuffer.add(utils.nullableString(clientId));
-    byteBuffer.addByte(0); // tagged_field
+    if (apiVersion >= 9) {
+      byteBuffer.add(utils.compactNullableString(transactionalId));
+    } else {
+      byteBuffer.add(utils.nullableString(transactionalId));
+    }
 
-    // byteBuffer.add(utils.nullableString(transactionalId));
-    byteBuffer.add(utils.compactNullableString(transactionalId));
     byteBuffer.add(utils.int16(acks));
     byteBuffer.add(utils.int32(timeoutMs));
-    // byteBuffer.add(utils.int32(topics.length));
-    byteBuffer.add(utils.compactArrayLength(topics.length));
+
+    if (apiVersion >= 9) {
+      byteBuffer.add(utils.compactArrayLength(topics.length));
+    } else {
+      byteBuffer.add(utils.int32(topics.length));
+    }
 
     for (final topic in topics) {
-      // byteBuffer.add(utils.string(topic.topicName));
-      byteBuffer.add(utils.compactString(topic.topicName));
-      // byteBuffer.add(utils.int32(topic.partitions?.length ?? 0));
-      byteBuffer.add(utils.compactArrayLength(topic.partitions?.length ?? 0));
+      if (apiVersion >= 9) {
+        byteBuffer.add(utils.compactString(topic.topicName));
+        byteBuffer.add(utils.compactArrayLength(topic.partitions?.length ?? 0));
+      } else {
+        byteBuffer.add(utils.string(topic.topicName));
+        byteBuffer.add(utils.int32(topic.partitions?.length ?? 0));
+      }
 
       for (Partition partition in topic.partitions ?? []) {
         if (partition.batch == null) {
@@ -52,23 +66,42 @@ class KafkaProduceApi {
         }
 
         byteBuffer.add(utils.int32(partition.partitionId));
-        final Uint8List recordBatch =
-            utils.recordBatch(partition.batch!.records!);
+        final Uint8List recordBatch = encoder.writeRecordBatch(
+            records: partition.batch!.records!,
+            producerId: producerId,
+            attributes: attributes,
+            lastOffsetDelta: lastOffsetDelta,
+            producerEpoch: producerEpoch,
+            baseSequence: baseSequence,
+            batchOffset: batchOffset,
+            partitionLeaderEpoch: partitionLeaderEpoch);
+
         byteBuffer = utils.writeUnsignedVarint(recordBatch.length + 1,
             byteBuffer); // adding the size of the RecordBatch
         byteBuffer.add(recordBatch);
       }
     }
 
-    // Adding the _tagged_fields
-    byteBuffer.addByte(0);
-    byteBuffer.addByte(0);
-    byteBuffer.addByte(0);
+    if (apiVersion >= 9) {
+      // Adding the _tagged_fields
+      byteBuffer.addByte(0);
+      byteBuffer.addByte(0);
+      byteBuffer.addByte(0);
+    }
 
     final message = byteBuffer.toBytes();
     byteBuffer.clear();
 
-    return Uint8List.fromList([...utils.int32(message.length), ...message]);
+    return Uint8List.fromList([
+      ...encoder.writeMessageHeader(
+          apiKey: apiKey,
+          apiVersion: apiVersion,
+          clientId: clientId,
+          correlationId: correlationId,
+          messageLength: message.length,
+          version: apiVersion > 8 ? 2 : 1),
+      ...message
+    ]);
   }
 
   /// Deserialize the ProduceResponse

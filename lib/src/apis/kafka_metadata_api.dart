@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dart_kafka/src/models/broker.dart';
 import 'package:dart_kafka/src/models/metadata/kafka_partition_metadata.dart';
 import 'package:dart_kafka/src/models/metadata/kafka_topic_metadata.dart';
+import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 import 'package:dart_kafka/src/models/responses/metadata_response.dart';
 import 'package:dart_kafka/src/protocol/apis.dart';
@@ -22,23 +23,42 @@ class KafkaMetadataApi {
       bool includeClusterAuthorizedOperations = false,
       bool includeTopicAuthorizedOperations = false}) {
     final byteBuffer = BytesBuilder();
-    byteBuffer.add(utils.int16(apiKey));
-    byteBuffer.add(utils.int16(apiVersion));
-    byteBuffer.add(utils.int32(correlationId));
+    final Encoder encoder = Encoder();
 
-    if (clientId != null) {
-      final clientIdBytes = clientId.codeUnits;
-      byteBuffer.add(utils.int16(clientIdBytes.length));
-      byteBuffer.add(clientIdBytes);
+    if (apiVersion >= 9) {
+      byteBuffer.add(utils.compactArrayLength(topics.length));
     } else {
-      byteBuffer.add(utils.int16(-1));
+      byteBuffer.add(utils.int32(topics.length));
     }
 
-    byteBuffer.add(utils.int32(topics.length));
     for (var topic in topics) {
-      final topicBytes = topic.codeUnits;
-      byteBuffer.add(utils.int16(topicBytes.length));
-      byteBuffer.add(topicBytes);
+      if (apiVersion >= 10) {
+        // topicId
+        byteBuffer.add([
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+        ]);
+      }
+      if (apiVersion >= 9) {
+        byteBuffer.add(utils.compactNullableString(topic));
+        byteBuffer.add(utils.int8(0)); // _tagged_fields
+      } else {
+        byteBuffer.add(utils.string(topic));
+      }
     }
 
     if (apiVersion >= 4) {
@@ -52,8 +72,22 @@ class KafkaMetadataApi {
       byteBuffer.add(utils.int8(includeTopicAuthorizedOperations ? 1 : 0));
     }
 
+    if (apiVersion >= 9) {
+      // Add _tagged_fields
+      byteBuffer.add(utils.int8(0));
+    }
+
     Uint8List message = byteBuffer.toBytes();
-    return Uint8List.fromList([...utils.int32(message.length), ...message]);
+    return Uint8List.fromList([
+      ...encoder.writeMessageHeader(
+          version: apiVersion >= 9 ? 2 : 1,
+          messageLength: message.length,
+          apiKey: apiKey,
+          apiVersion: apiVersion,
+          correlationId: correlationId,
+          clientId: clientId),
+      ...message
+    ]);
   }
 
   /// Method to deserialize the MetadataResponse from a Byte Array
@@ -831,97 +865,66 @@ class KafkaMetadataApi {
     final int throttleTimeMs = buffer.getInt32(offset);
     offset += 4;
 
-    final int brokersLength = buffer.getInt16(offset);
-    offset += 2;
+    final brokerLength = utils.readCompactArrayLength(buffer, offset);
+    offset += brokerLength.bytesRead;
 
-    if (brokersLength < 0) {
-      throw Exception("Invalid brokersLength: $brokersLength");
+    if (brokerLength.value < 0) {
+      throw Exception("No Brokers were returned: ${brokerLength.value}");
     }
 
-    for (int i = 0; i < brokersLength; i++) {
+    for (int i = 0; i < brokerLength.value; i++) {
       final int nodeId = buffer.getInt32(offset);
       offset += 4;
 
-      final int hostLength = buffer.getInt16(offset);
-      offset += 2;
-
-      if (offset + hostLength > buffer.lengthInBytes) {
-        throw Exception("Insufficient bytes to read host");
-      }
-
-      final String host =
-          String.fromCharCodes(buffer.buffer.asUint8List(offset, hostLength));
-      offset += hostLength;
+      final host = utils.readCompactString(buffer, offset);
+      offset += host.bytesRead;
 
       final int port = buffer.getInt32(offset);
       offset += 4;
 
-      final int rackLength = buffer.getInt16(offset);
-      offset += 2;
+      final rackRead = utils.readCompactNullableString(buffer, offset);
+      offset += rackRead.bytesRead;
 
-      String? rack;
-      if (rackLength != -1) {
-        if (offset + rackLength > buffer.lengthInBytes) {
-          throw Exception("Insufficient bytes to read rack");
-        }
-        rack =
-            String.fromCharCodes(buffer.buffer.asUint8List(offset, rackLength));
-        offset += rackLength;
-      }
-
-      brokers.add(Broker(nodeId: nodeId, host: host, port: port, rack: rack));
+      brokers.add(Broker(
+          nodeId: nodeId, host: host.value, port: port, rack: rackRead.value));
     }
 
-    final int clusterIdLength = buffer.getInt16(offset);
-    offset += 2;
-
-    String? clusterId;
-    if (clusterIdLength != -1) {
-      if (offset + clusterIdLength > buffer.lengthInBytes) {
-        throw Exception("Insufficient bytes to read clusterId");
-      }
-      clusterId = String.fromCharCodes(
-          buffer.buffer.asUint8List(offset, clusterIdLength));
-      offset += clusterIdLength;
-    }
+    final clusterId = utils.readCompactNullableString(buffer, offset);
+    offset += clusterId.bytesRead;
 
     final int controllerId = buffer.getInt32(offset);
     offset += 4;
 
-    final int topicsLength = buffer.getInt32(offset);
-    offset += 4;
+    final topicsLength = utils.readCompactArrayLength(buffer, offset);
+    offset += topicsLength.bytesRead;
 
-    if (topicsLength < 0) {
+    if (topicsLength.value < 0) {
       throw Exception("Invalid topicsLength: $topicsLength");
     }
 
-    for (int i = 0; i < topicsLength; i++) {
+    for (int i = 0; i < topicsLength.value; i++) {
       final int errorCode = buffer.getInt16(offset);
       offset += 2;
 
-      final int topicNameLength = buffer.getInt16(offset);
-      offset += 2;
+      final topicName = utils.readCompactNullableString(buffer, offset);
+      offset += topicName.bytesRead;
 
-      if (offset + topicNameLength > buffer.lengthInBytes) {
-        throw Exception("Insufficient bytes to read topicName");
-      }
-
-      final String topicName = String.fromCharCodes(
-          buffer.buffer.asUint8List(offset, topicNameLength));
-      offset += topicNameLength;
+      // Ignores the UUID
+      offset += 16;
 
       final bool isInternal = buffer.getInt8(offset) == 1;
       offset += 1;
 
       final List<KafkaPartitionMetadata> partitions = [];
-      final int partitionsLength = buffer.getInt32(offset);
-      offset += 4;
 
-      if (partitionsLength < 0) {
+      final partitionsLength = utils.readCompactArrayLength(buffer, offset);
+      offset += partitionsLength.bytesRead;
+
+      if (partitionsLength.value < 0) {
         throw Exception("Invalid partitionsLength: $partitionsLength");
       }
 
-      for (int j = 0; j < partitionsLength; j++) {
+      for (int j = 0; j < partitionsLength.value; j++) {
         final int partitionErrorCode = buffer.getInt16(offset);
         offset += 2;
 
@@ -934,31 +937,44 @@ class KafkaMetadataApi {
         final int leaderEpoch = buffer.getInt32(offset);
         offset += 4;
 
-        final int replicasLength = buffer.getInt32(offset);
-        offset += 4;
+        final replicasLength = utils.readCompactArrayLength(buffer, offset);
+        offset += replicasLength.bytesRead;
 
-        if (replicasLength < 0) {
+        if (replicasLength.value < 0) {
           throw Exception("Invalid replicasLength: $replicasLength");
         }
 
         final List<int> replicas = [];
-        for (int k = 0; k < replicasLength; k++) {
+        for (int k = 0; k < replicasLength.value; k++) {
           replicas.add(buffer.getInt32(offset));
           offset += 4;
         }
 
-        final int isrLength = buffer.getInt32(offset);
-        offset += 4;
+        final isrLength = utils.readCompactArrayLength(buffer, offset);
+        offset += isrLength.bytesRead;
 
-        if (isrLength < 0) {
+        if (isrLength.value < 0) {
           throw Exception("Invalid isrLength: $isrLength");
         }
 
         final List<int> isr = [];
-        for (int k = 0; k < isrLength; k++) {
+        for (int k = 0; k < isrLength.value; k++) {
           isr.add(buffer.getInt32(offset));
           offset += 4;
         }
+
+        final offlineReplicasLength =
+            utils.readCompactArrayLength(buffer, offset);
+        offset += offlineReplicasLength.bytesRead;
+
+        final List<int> offlineReplicas = [];
+        for (int o = 0; o < offlineReplicasLength.value; o++) {
+          offlineReplicas.add(buffer.getInt32(offset));
+          offset += 4;
+        }
+
+        final taggedField = buffer.getInt8(offset);
+        offset += 1;
 
         partitions.add(KafkaPartitionMetadata(
           errorCode: partitionErrorCode,
@@ -974,9 +990,14 @@ class KafkaMetadataApi {
       final int topicAuthorizedOperations = buffer.getInt32(offset);
       offset += 4;
 
+      final taggedField1 = buffer.getInt8(offset);
+      offset += 1;
+      final taggedField2 = buffer.getInt8(offset);
+      offset += 1;
+
       topics.add(KafkaTopicMetadata(
         errorCode: errorCode,
-        topicName: topicName,
+        topicName: topicName.value ?? '',
         isInternal: isInternal,
         partitions: partitions,
         topicAuthorizedOperations: topicAuthorizedOperations,
@@ -988,7 +1009,7 @@ class KafkaMetadataApi {
       brokers: brokers,
       topics: topics,
       controllerId: controllerId,
-      clusterId: clusterId,
+      clusterId: clusterId.value,
     );
   }
 }
