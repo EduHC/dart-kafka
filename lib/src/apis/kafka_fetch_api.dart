@@ -63,10 +63,9 @@ class KafkaFetchApi {
 
       byteBuffer.add(utils.int32(topic.partitions!.length));
       for (final partition in topic.partitions!) {
-        byteBuffer.add(utils.int32(partition.partitionId));
+        byteBuffer.add(utils.int32(partition.id));
         byteBuffer.add(utils.int64(partition.fetchOffset ?? 0));
-        byteBuffer.add(utils.int64(partition
-            .logStartOffset)); // Log start offset (only for versions >= 5)
+        byteBuffer.add(utils.int64(partition.logStartOffset ?? 0)); // Log start offset (only for versions >= 5)
         byteBuffer.add(utils.int32(partition.maxBytes ?? 45));
       }
     }
@@ -167,7 +166,7 @@ class KafkaFetchApi {
         offset += recordsLength;
 
         partitions.add(Partition(
-          partitionId: partitionId,
+          id: partitionId,
           errorCode: partitionErrorCode,
           highWatermark: highWatermark,
           lastStableOffset: lastStableOffset,
