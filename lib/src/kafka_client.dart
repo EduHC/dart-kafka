@@ -2,25 +2,37 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dart_kafka/src/protocol/endocer.dart';
+import 'package:dart_kafka/src/protocol/request_controller.dart';
 import 'package:dart_kafka/src/protocol/response_controller.dart';
-import 'package:dart_kafka/src/typedefs/types.dart';
+import 'package:dart_kafka/src/protocol/utils.dart';
+import 'package:dart_kafka/src/definitions/types.dart';
 
 class KafkaClient {
   late Socket? _socket;
   final String host;
   final int port;
-  final ResponseController responseController = ResponseController();
+  late final ResponseController responseController;
+  late final RequestController requestController;
   late StreamSubscription? _subscription;
+  final StreamController _eventController = StreamController();
 
+  final Utils utils = Utils();
+  final Encoder encoder = Encoder();
+
+  Stream get eventStream => _eventController.stream.asBroadcastStream();
   Socket? get server => _socket;
 
-  KafkaClient({required this.host, required this.port});
+  KafkaClient({required this.host, required this.port}) {
+    responseController = ResponseController(eventController: _eventController);
+  }
 
   Future<void> connect() async {
     _socket = await Socket.connect(host, port);
     if (_socket == null) throw Exception("Server hasn't connected");
 
     _socket!.setOption(SocketOption.tcpNoDelay, true);
+    requestController = RequestController(server: _socket!);
     Future.microtask(() {
       _subscription = _socket!.listen(
         (event) => _handleResponse(event),
@@ -46,21 +58,31 @@ class KafkaClient {
     responseController.drainQueue();
   }
 
-  void addPendingRequest(
+  Future<dynamic> storeProcessingRequest(
       {required int correlationId,
       required Deserializer deserializer,
-      required int apiVersion}) {
-    responseController.addPendingRequest(
+      required int apiVersion,
+      bool async = true}) async {
+    Future<dynamic> res = responseController.storeProcessingRequest(
         correlationId: correlationId,
         deserializer: deserializer,
-        apiVersion: apiVersion);
-  }
+        apiVersion: apiVersion,
+        async: async);
 
-  void completeRequest({required int correlationId}) {
-    responseController.completeRequest(correlationId: correlationId);
+    if (async) return;
+
+    return res;
   }
 
   bool hasPendingProcesses() {
     return responseController.hasPendingProcesses;
+  }
+
+  Future<void> enqueueRequest(
+      {required Uint8List request,
+      required int correlationId,
+      required bool async}) async {
+    return requestController.enqueue(
+        request: request, correlationId: correlationId, async: async);
   }
 }
