@@ -1,21 +1,22 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dart_kafka/dart_kafka.dart';
+import 'package:dart_kafka/src/apis/kafka_describe_producer_api.dart';
 import 'package:dart_kafka/src/apis/kafka_initi_producer_id_api.dart';
 import 'package:dart_kafka/src/apis/kafka_produce_api.dart';
-import 'package:dart_kafka/src/models/topic.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaProducer {
   final KafkaClient kafka;
   final KafkaProduceApi produceApi = KafkaProduceApi();
   final KafkaInitProducerIdApi initProducerIdApi = KafkaInitProducerIdApi();
+  final KafkaDescribeProducerApi describeProducerApi =
+      KafkaDescribeProducerApi();
   final Utils utils = Utils();
 
   KafkaProducer({required this.kafka});
 
-  Future<void> produce({
+  Future<dynamic> produce({
     int? correlationId,
     int apiVersion = 11,
     int attributes = 0,
@@ -30,11 +31,8 @@ class KafkaProducer {
     required int acks,
     required int timeoutMs,
     required List<Topic> topics,
+    bool async = true
   }) async {
-    Socket? server = kafka.server;
-
-    if (server == null) return;
-
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = produceApi.serialize(
@@ -55,26 +53,29 @@ class KafkaProducer {
     );
 
     print("${DateTime.now()} || [APP] ProduceRequest: $message");
-    server.add(message);
-    await server.flush();
+    kafka.enqueueRequest(request: message, correlationId: finalCorrelationId, async: async);
 
-    kafka.addPendingRequest(
+    Future<dynamic> res = kafka.storeProcessingRequest(
         correlationId: finalCorrelationId,
         deserializer: produceApi.deserialize,
-        apiVersion: apiVersion ?? 7);
+        apiVersion: apiVersion ?? 7,
+        async: async,
+    );
+
+    if (async) return;
+
+    return res;
   }
 
-  Future<void> initProduceId({
+  Future<dynamic> initProduceId({
     required int transactionTimeoutMs,
     required int producerId,
     required int producerEpoch,
     int? correlationId,
     int? apiVersion,
     String? clientId,
+    bool async = true,
   }) async {
-    Socket? server = kafka.server;
-    if (server == null) return;
-
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
     Uint8List message = initProducerIdApi.serialize(
         transactionTimeoutMs: transactionTimeoutMs,
@@ -85,12 +86,48 @@ class KafkaProducer {
         correlationId: finalCorrelationId);
 
     print("${DateTime.now()} || [APP] InitProduceId: $message");
-    server.add(message);
-    await server.flush();
+    kafka.enqueueRequest(request: message, correlationId: finalCorrelationId, async: async);
 
-    kafka.addPendingRequest(
+    Future<dynamic> res = kafka.storeProcessingRequest(
         correlationId: finalCorrelationId,
         deserializer: initProducerIdApi.deserialize,
-        apiVersion: apiVersion ?? 4);
+        apiVersion: apiVersion ?? 4,
+        async: async,
+    );
+
+    if (async) return;
+
+    return res;
+  }
+
+  Future<dynamic> describeProducer({
+    required List<Topic> topics,
+    int apiVersion = 0,
+    String? clientId,
+    int? correlationId,
+    bool async = true,
+  }) async {
+    final int finalCorrelationId =
+        correlationId ?? utils.generateCorrelationId();
+
+    Uint8List message = describeProducerApi.serialize(
+        correlationId: finalCorrelationId,
+        topics: topics,
+        apiVersion: apiVersion,
+        clientId: clientId);
+
+    print("${DateTime.now()} || [APP] DescribeProducerRequest: $message");
+    kafka.enqueueRequest(request: message, correlationId: finalCorrelationId, async: async);
+
+    Future<dynamic> res = kafka.storeProcessingRequest(
+        correlationId: finalCorrelationId,
+        deserializer: describeProducerApi.deserialize,
+        apiVersion: apiVersion,
+        async: async,
+    );
+
+    if (async) return;
+
+    return res;
   }
 }

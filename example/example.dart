@@ -1,11 +1,4 @@
 import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/models/components/protocol.dart';
-import 'package:dart_kafka/src/models/components/protocol_metadata.dart';
-import 'package:dart_kafka/src/models/components/record_batch.dart';
-import 'package:dart_kafka/src/models/components/record_header.dart';
-import 'package:dart_kafka/src/models/partition.dart';
-import 'package:dart_kafka/src/models/topic.dart';
-import 'package:dart_kafka/src/models/components/record.dart';
 
 void main() async {
   // final KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
@@ -18,29 +11,64 @@ void main() async {
   }
 
   // TESTING THE ADMIN COMMANDS
-  KafkaAdmin admin = KafkaAdmin(kafka: kafka);
-  // await admin.sendApiVersionRequest(apiVersion: 0, clientId: 'test');
-  await admin.sendMetadataRequest(
-      topics: ['test-topic'],
-      allowAutoTopicCreation: true,
-      includeClusterAuthorizedOperations: true,
-      includeTopicAuthorizedOperations: true,
-      clientId: 'dart-kafka',
-      apiVersion: 12);
+  // KafkaAdmin admin = KafkaAdmin(kafka: kafka);
+  // dynamic res = await admin.sendApiVersionRequest(
+  //     apiVersion: 0, clientId: 'test', async: true);
+
+  Future.microtask(
+    () => kafka.eventStream.listen(
+      (event) => print("Received from Stream: $event"),
+    ),
+  );
+
+  print("");
+  print("");
+  // print("Printed in the await response: $res");
+  // await admin.sendMetadataRequest(
+  //     topics: ['test-topic'],
+  //     allowAutoTopicCreation: true,
+  //     includeClusterAuthorizedOperations: true,
+  //     includeTopicAuthorizedOperations: true,
+  //     clientId: 'dart-kafka',
+  //     apiVersion: 12);
 
   // TESTING THE CONSUMER COMMANDS
-  // KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
-  // List<Topic> topics = [
-  //   Topic(topicName: 'test-topic', partitions: [
-  //     Partition(partitionId: 0, logStartOffset: 0, fetchOffset: 0)
-  //   ])
+  KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
+  List<Topic> topics = [
+    Topic(
+        topicName: 'testeomnilightvitaverse.machine_config',
+        partitions: [Partition(id: 0)]),
+    // Topic(topicName: 'testeomnilightvitaverse.sensors', partitions: [Partition(id: 0)]),
+  ];
+  var res = await consumer.sendFetchRequest(
+      clientId: 'consumer',
+      topics: topics,
+      isolationLevel: 0,
+      apiVersion: 8,
+      async: false);
+
+  print("$res");
+
+  // topics = [
+  //   // Topic(topicName: 'testeomnilightvitaverse.status', partitions: [Partition(id: 0)]),
+  //   Topic(topicName: 'testeomnilightvitaverse.sensors', partitions: [Partition(id: 0)]),
   // ];
-  // await consumer.sendFetchRequest(
-  //   clientId: 'consumer',
-  //   topics: topics,
-  //   isolationLevel: 0,
-  //   apiVersion: 8,
-  // );
+  // res = await consumer.sendFetchRequest(
+  //     clientId: 'consumer',
+  //     topics: topics,
+  //     isolationLevel: 0,
+  //     apiVersion: 8,
+  //     async: false);
+
+  res = await consumer.sendListOffsetsRequest(
+    isolationLevel: 0,
+    topics: topics,
+    apiVersion: 9,
+    async: false,
+  );
+
+  print("$res");
+
   // List<Protocol> protocols = [
   //   Protocol(
   //       name: 'range',
@@ -62,7 +90,7 @@ void main() async {
   //     reason: 'Testing');
 
   // TESTING THE PRODUCER COMMANDS
-  // KafkaProducer producer = KafkaProducer(kafka: kafka);
+  KafkaProducer producer = KafkaProducer(kafka: kafka);
 
   // await producer.initProduceId(
   //     correlationId: null,
@@ -94,7 +122,7 @@ void main() async {
   //     key: null,
   //     value: '{\'deutsch\': \'land\'}'));
   // RecordBatch batch = RecordBatch(
-  //   producerId: 15,
+  //   producerId: 27,
   //   partitionLeaderEpoch: -1,
   //   attributes: 0,
   //   baseOffset: 0,
@@ -103,8 +131,8 @@ void main() async {
   //   magic: 2,
   //   records: records,
   // );
-  // partitions.add(Partition(partitionId: 0, logStartOffset: 0, batch: batch));
-  // topics.add(Topic(topicName: 'alt', partitions: partitions));
+  // partitions.add(Partition(id: 0, batch: batch));
+  // topics.add(Topic(topicName: 'test-topic', partitions: partitions));
   // await producer.produce(
   //     acks: -1,
   //     timeoutMs: 1500,
@@ -112,7 +140,14 @@ void main() async {
   //     apiVersion: 11,
   //     clientId: 'dart-kafka',
   //     correlationId: null,
-  //     transactionalId: null);
+  //     transactionalId: null,
+  //     baseSequence: 3,
+  //     producerId: -1);
+  // await producer.describeProducer(
+  //     apiVersion: 0,
+  //     clientId: 'dart-kafka',
+  //     correlationId: null,
+  //     topics: topics);
 
   await kafka.close();
   return;

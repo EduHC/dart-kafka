@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dart_kafka/src/apis/kafka_fetch_api.dart';
 import 'package:dart_kafka/src/apis/kafka_join_group_api.dart';
+import 'package:dart_kafka/src/apis/kafka_list_offset_api.dart';
 import 'package:dart_kafka/src/kafka_client.dart';
 import 'package:dart_kafka/src/models/components/protocol.dart';
 import 'package:dart_kafka/src/models/topic.dart';
@@ -12,25 +13,22 @@ class KafkaConsumer {
   final KafkaClient kafka;
   final KafkaFetchApi fetchApi = KafkaFetchApi();
   final KafkaJoinGroupApi joinGroupApi = KafkaJoinGroupApi();
+  final KafkaListOffsetApi listOffsetApi = KafkaListOffsetApi();
   final Utils utils = Utils();
 
   KafkaConsumer({required this.kafka});
 
-  Future<void> sendFetchRequest({
-    int? correlationId,
-    int? apiVersion,
-    required String clientId,
-    int? replicaId,
-    int? maxWaitMs,
-    int? minBytes,
-    int? maxBytes,
-    int? isolationLevel,
-    required List<Topic> topics,
-  }) async {
-    Socket? server = kafka.server;
-
-    if (server == null) return;
-
+  Future<dynamic> sendFetchRequest(
+      {int? correlationId,
+      int? apiVersion,
+      required String clientId,
+      int? replicaId,
+      int? maxWaitMs,
+      int? minBytes,
+      int? maxBytes,
+      int? isolationLevel,
+      required List<Topic> topics,
+      bool async = true}) async {
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = fetchApi.serialize(
@@ -45,16 +43,22 @@ class KafkaConsumer {
         topics: topics);
 
     print("${DateTime.now()} || [APP] FetchRequest: $message");
-    server.add(message);
-    await server.flush();
+    kafka.enqueueRequest(
+        request: message, correlationId: finalCorrelationId, async: async);
 
-    kafka.addPendingRequest(
-        correlationId: finalCorrelationId,
-        deserializer: fetchApi.deserialize,
-        apiVersion: apiVersion ?? 17);
+    Future<dynamic> res = kafka.storeProcessingRequest(
+      correlationId: finalCorrelationId,
+      deserializer: fetchApi.deserialize,
+      apiVersion: apiVersion ?? 17,
+      async: async,
+    );
+
+    if (async) return;
+
+    return res;
   }
 
-  Future<void> sendJoinGroupRequest({
+  Future<dynamic> sendJoinGroupRequest({
     int? correlationId,
     int? apiVersion,
     required String groupId,
@@ -65,11 +69,8 @@ class KafkaConsumer {
     required String protocolType,
     required List<Protocol> protocols,
     String? reason,
+    bool async = true,
   }) async {
-    Socket? server = kafka.server;
-
-    if (server == null) return;
-
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = joinGroupApi.serialize(
@@ -83,15 +84,60 @@ class KafkaConsumer {
       groupInstanceId: groupInstanceId,
       protocols: protocols,
       reason: reason,
-
     );
     print("${DateTime.now()} || [APP] JoinGroupRequest: $message");
-    server.add(message);
-    await server.flush();
+    kafka.enqueueRequest(
+        request: message, correlationId: finalCorrelationId, async: async);
 
-    kafka.addPendingRequest(
-        correlationId: finalCorrelationId,
-        deserializer: joinGroupApi.deserialize,
-        apiVersion: apiVersion ?? 9);
+    Future<dynamic> res = kafka.storeProcessingRequest(
+      correlationId: finalCorrelationId,
+      deserializer: joinGroupApi.deserialize,
+      apiVersion: apiVersion ?? 9,
+      async: async,
+    );
+
+    if (async) return;
+
+    return res;
+  }
+
+  Future<dynamic> sendListOffsetsRequest({
+    int? correlationId,
+    int apiVersion = 9,
+    bool async = true,
+    required int isolationLevel,
+    int leaderEpoch = -1,
+    int limit = 10,
+    int replicaId = 0,
+    String? clientId,
+    required List<Topic> topics,
+  }) async {
+    int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+
+    Uint8List message = listOffsetApi.serialize(
+      correlationId: finalCorrelationId,
+      apiVersion: apiVersion,
+      isolationLevel: isolationLevel,
+      leaderEpoch: leaderEpoch,
+      limit: limit,
+      replicaId: replicaId,
+      clientId: clientId,
+      topics: topics,
+    );
+
+    print("${DateTime.now()} || [APP] ListOffsetRequest: $message");
+    kafka.enqueueRequest(
+        request: message, correlationId: finalCorrelationId, async: async);
+
+    Future<dynamic> res = kafka.storeProcessingRequest(
+      correlationId: finalCorrelationId,
+      deserializer: listOffsetApi.deserialize,
+      apiVersion: apiVersion,
+      async: async,
+    );
+
+    if (async) return;
+
+    return res;
   }
 }

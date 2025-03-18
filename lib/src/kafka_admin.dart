@@ -10,18 +10,19 @@ class KafkaAdmin {
   final KafkaClient kafka;
   final KafkaVersionApi versionApi = KafkaVersionApi();
   final KafkaMetadataApi metadataApi = KafkaMetadataApi();
-  final Utils utils = Utils();
+  late final Utils utils;
 
-  KafkaAdmin({required this.kafka});
+  KafkaAdmin({required this.kafka}) {
+    utils = kafka.utils;
+  }
 
-  Future<void> sendApiVersionRequest({
-    String? clientId,
-    int? apiVersion,
-    int? correlationId,
-  }) async {
+  Future<dynamic> sendApiVersionRequest(
+      {String? clientId,
+      int? apiVersion,
+      int? correlationId,
+      bool async = true}) async {
     if (kafka.server == null) return;
 
-    Socket server = kafka.server!;
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = versionApi.serialize(
@@ -30,26 +31,32 @@ class KafkaAdmin {
         apiVersion: apiVersion ?? 0);
 
     print("${DateTime.now()} || [APP] ApiVersionRequest: $message");
-    server.add(message);
-    await server.flush();
+    kafka.enqueueRequest(
+        request: message, correlationId: finalCorrelationId, async: async);
 
-    kafka.addPendingRequest(
-        correlationId: finalCorrelationId,
-        deserializer: versionApi.deserialize,
-        apiVersion: apiVersion ?? 0);
+    Future<dynamic> res = kafka.storeProcessingRequest(
+      correlationId: finalCorrelationId,
+      deserializer: versionApi.deserialize,
+      apiVersion: apiVersion ?? 0,
+      async: async,
+    );
+
+    if (async) return;
+
+    return res;
   }
 
-  Future<void> sendMetadataRequest(
+  Future<dynamic> sendMetadataRequest(
       {int? correlationId,
       int? apiVersion,
       bool? allowAutoTopicCreation,
       bool? includeClusterAuthorizedOperations,
       bool? includeTopicAuthorizedOperations,
       required List<String> topics,
-      String? clientId}) async {
+      String? clientId,
+      bool async = true}) async {
     if (kafka.server == null) return;
 
-    Socket server = kafka.server!;
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = metadataApi.serialize(
@@ -62,12 +69,18 @@ class KafkaAdmin {
         includeTopicAuthorizedOperations: false);
 
     print("${DateTime.now()} || [APP] MetadataRequest: $message");
-    server.add(message);
-    await server.flush();
+    kafka.enqueueRequest(
+        request: message, correlationId: finalCorrelationId, async: async);
 
-    kafka.addPendingRequest(
+    Future<dynamic> res = kafka.storeProcessingRequest(
         correlationId: finalCorrelationId,
         deserializer: metadataApi.deserialize,
-        apiVersion: apiVersion ?? 5);
+        apiVersion: apiVersion ?? 5,
+        async: async,
+    );
+
+    if (async) return;
+
+    return res;
   }
 }
