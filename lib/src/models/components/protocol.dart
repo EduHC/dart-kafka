@@ -1,4 +1,4 @@
-import 'package:dart_kafka/src/models/components/protocol_metadata.dart';
+import 'package:dart_kafka/src/models/metadata/kafka_protocol_metadata.dart';
 
 class Protocol {
   final String name;
