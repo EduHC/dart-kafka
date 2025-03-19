@@ -1,4 +1,4 @@
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 
 class MessageHeaders {
   static int requestHeaderVersion({required int apiVersion, required int apiKey}) {
