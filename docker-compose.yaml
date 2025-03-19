@@ -60,8 +60,6 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 5
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR : 1
       # KAFKA_REPLICA_SOCKET_RECEIVE_BUFFER_BYTES: 0
-      LOG4J_LOGGER_KAFKA: 'warn'
-      LOG4J_LOGGER_ORG_APACHE_KAFKA: 'warn'
     depends_on:
       - kafka-controller-1
       # - kafka-controller-2

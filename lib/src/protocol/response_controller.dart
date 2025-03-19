@@ -117,7 +117,6 @@ class ResponseController {
       _responseCompleters[correlationId]!.complete(entity);
       _responseCompleters.remove(correlationId);
     } else {
-      // eventController.add({'correlationId': correlationId, 'entity': entity});
       eventController.add(entity);
     }
   }
