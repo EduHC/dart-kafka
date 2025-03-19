@@ -37,11 +37,11 @@ void main() async {
   List<Topic> topics = [
     Topic(
         topicName: 'testeomnilightvitaverse.machine_config',
-        partitions: [Partition(id: 0)]),
+        partitions: [Partition(id: 0, fetchOffset: 11)]),
     // Topic(topicName: 'testeomnilightvitaverse.sensors', partitions: [Partition(id: 0)]),
   ];
   var res = await consumer.sendFetchRequest(
-      clientId: 'consumer',
+      clientId: 'testeomnilightvitaverse',
       topics: topics,
       isolationLevel: 0,
       apiVersion: 8,
@@ -60,14 +60,14 @@ void main() async {
   //     apiVersion: 8,
   //     async: false);
 
-  res = await consumer.sendListOffsetsRequest(
-    isolationLevel: 0,
-    topics: topics,
-    apiVersion: 9,
-    async: false,
-  );
+  // res = await consumer.sendListOffsetsRequest(
+  //   isolationLevel: 0,
+  //   topics: topics,
+  //   apiVersion: 9,
+  //   async: false,
+  // );
 
-  print("$res");
+  // print("$res");
 
   // List<Protocol> protocols = [
   //   Protocol(

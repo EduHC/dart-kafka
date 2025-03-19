@@ -1,12 +1,14 @@
 import 'dart:typed_data';
 import 'package:dart_kafka/src/models/components/protocol.dart';
 import 'package:dart_kafka/src/models/responses/join_group_response.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
+import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaJoinGroupApi {
   final int apiKey = JOIN_GROUP;
   final Utils utils = Utils();
+  final Encoder encoder = Encoder();
 
   /// Serialize the JoinGroupRequest to bytes
   Uint8List serialize(
@@ -22,40 +24,25 @@ class KafkaJoinGroupApi {
       required int apiVersion}) {
     final byteBuffer = BytesBuilder();
 
-    byteBuffer.add(utils.int16(apiKey));
-    byteBuffer.add(utils.int16(apiVersion));
-    byteBuffer.add(utils.int32(correlationId));
+    byteBuffer.add(encoder.compactString(groupId));
+    byteBuffer.add(encoder.int32(sessionTimeoutMs));
+    byteBuffer.add(encoder.int32(rebalanceTimeoutMs));
+    byteBuffer.add(encoder.compactString(memberId));
+    byteBuffer.add(encoder.compactNullableString(groupInstanceId));
+    byteBuffer.add(encoder.compactString(protocolType));
+    byteBuffer.add(encoder.compactArrayLength(protocols.length));
 
-    List<int> strUnits = groupId.codeUnits;
-    byteBuffer.add(utils.int16(strUnits.length));
-    byteBuffer.add(strUnits);
-
-    // byteBuffer.add(utils.compactString(groupId));
-    byteBuffer.add(utils.int32(sessionTimeoutMs));
-    // byteBuffer.add(utils.int32(rebalanceTimeoutMs));
-    strUnits = memberId.codeUnits;
-    byteBuffer.add(utils.int16(strUnits.length));
-    byteBuffer.add(strUnits);
-
-    // byteBuffer.add(utils.compactString(memberId));
-    // byteBuffer.add(utils.compactNullableString(groupInstanceId));
-    strUnits = protocolType.codeUnits;
-    byteBuffer.add(utils.int16(strUnits.length));
-    byteBuffer.add(strUnits);
-    // byteBuffer.add(utils.compactString(protocolType));
-
-    byteBuffer.add(utils.int32(protocols.length));
     for (final protocol in protocols) {
-      byteBuffer.add(utils.compactString(protocol.name));
+      byteBuffer.add(encoder.compactString(protocol.name));
 
       final BytesBuilder metadataBytes = BytesBuilder();
-      metadataBytes.add(utils.int16(protocol.metadata.version));
+      metadataBytes.add(encoder.int16(protocol.metadata.version));
       metadataBytes.add([protocol.metadata.topics.length]);
 
       for (String topic in protocol.metadata.topics) {
         metadataBytes.add(topic.codeUnits);
       }
-      byteBuffer.add(utils.compactBytes(metadataBytes.toBytes()));
+      byteBuffer.add(encoder.compactBytes(metadataBytes.toBytes()));
 
       if (protocol.metadata.userDataBytes != null) {
         byteBuffer.add(protocol.metadata.userDataBytes!);
@@ -64,8 +51,10 @@ class KafkaJoinGroupApi {
 
     // byteBuffer.add(utils.compactNullableString(reason));
 
-    final message = Uint8List.fromList(
-        [...utils.int32(byteBuffer.toBytes().length), ...byteBuffer.toBytes()]);
+    final message = Uint8List.fromList([
+      ...encoder.int32(byteBuffer.toBytes().length),
+      ...byteBuffer.toBytes()
+    ]);
 
     final buffer = ByteData.sublistView(message);
     return message;
@@ -127,5 +116,4 @@ class KafkaJoinGroupApi {
         leader: leader.value,
         memberId: memberId.value);
   }
-
 }

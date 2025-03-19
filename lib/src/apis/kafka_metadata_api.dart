@@ -6,11 +6,12 @@ import 'package:dart_kafka/src/models/metadata/kafka_topic_metadata.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 import 'package:dart_kafka/src/models/responses/metadata_response.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 
 class KafkaMetadataApi {
   final int apiKey = METADATA;
   final Utils utils = Utils();
+  final Encoder encoder = Encoder();
 
   /// Method to serialize to build and serialize the MetadataRequest to Byte Array
   /// Default value of allowAutoTopicCreation is FALSE
@@ -26,9 +27,9 @@ class KafkaMetadataApi {
     final Encoder encoder = Encoder();
 
     if (apiVersion >= 9) {
-      byteBuffer.add(utils.compactArrayLength(topics.length));
+      byteBuffer.add(encoder.compactArrayLength(topics.length));
     } else {
-      byteBuffer.add(utils.int32(topics.length));
+      byteBuffer.add(encoder.int32(topics.length));
     }
 
     for (var topic in topics) {
@@ -54,27 +55,27 @@ class KafkaMetadataApi {
         ]);
       }
       if (apiVersion >= 9) {
-        byteBuffer.add(utils.compactNullableString(topic));
-        byteBuffer.add(utils.int8(0)); // _tagged_fields
+        byteBuffer.add(encoder.compactNullableString(topic));
+        byteBuffer.add(encoder.int8(0)); // _tagged_fields
       } else {
-        byteBuffer.add(utils.string(topic));
+        byteBuffer.add(encoder.string(topic));
       }
     }
 
     if (apiVersion >= 4) {
-      byteBuffer.add(utils.int8(allowAutoTopicCreation ? 1 : 0));
+      byteBuffer.add(encoder.int8(allowAutoTopicCreation ? 1 : 0));
     }
 
     if (apiVersion >= 8) {
       if (apiVersion < 11) {
-        byteBuffer.add(utils.int8(includeClusterAuthorizedOperations ? 1 : 0));
+        byteBuffer.add(encoder.int8(includeClusterAuthorizedOperations ? 1 : 0));
       }
-      byteBuffer.add(utils.int8(includeTopicAuthorizedOperations ? 1 : 0));
+      byteBuffer.add(encoder.int8(includeTopicAuthorizedOperations ? 1 : 0));
     }
 
     if (apiVersion >= 9) {
       // Add _tagged_fields
-      byteBuffer.add(utils.int8(0));
+      byteBuffer.add(encoder.int8(0));
     }
 
     Uint8List message = byteBuffer.toBytes();

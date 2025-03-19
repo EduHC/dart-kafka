@@ -1,9 +1,5 @@
-import 'dart:convert';
-import 'dart:ffi';
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:dart_kafka/src/models/components/record.dart';
 import 'package:dart_kafka/src/models/components/record_header.dart';
 import 'package:dart_kafka/src/protocol/crc32.dart';
 
@@ -12,148 +8,17 @@ class Utils {
     return CRC32C.calculate(data);
   }
 
-  Uint8List int8(int value) {
-    final data = ByteData(1);
-    data.setInt8(0, value);
-    return data.buffer.asUint8List();
-  }
-
-  Uint8List uint8(int value) {
-    ByteData data = ByteData(1);
-    data.setUint8(0, value);
-    return data.buffer.asUint8List();
-  }
-
-  Uint8List int16(int value) {
-    final data = ByteData(2);
-    data.setInt16(0, value, Endian.big);
-    return data.buffer.asUint8List();
-  }
-
-  Uint8List uint16(int value) {
-    ByteData data = ByteData(2);
-    data.setUint16(0, value);
-    return data.buffer.asUint8List();
-  }
-
-  Uint8List int32(int value) {
-    final data = ByteData(4);
-    data.setInt32(0, value, Endian.big);
-    return data.buffer.asUint8List();
-  }
-
-  Uint8List uint32(int value) {
-    final data = ByteData(4);
-    data.setUint32(0, value, Endian.big);
-    return data.buffer.asUint8List();
-  }
-
-  Uint8List int64(int value) {
-    final data = ByteData(8);
-    data.setInt64(0, value, Endian.big);
-    return data.buffer.asUint8List();
-  }
-
-  Uint8List uint64(int value) {
-    ByteData data = ByteData(8);
-    data.setUint64(0, value);
-    return data.buffer.asUint8List();
-  }
-
-  BytesBuilder writeVarint(int value, BytesBuilder buffer) {
-    return writeUnsignedVarint((value << 1) ^ (value >> 31), buffer);
-  }
-
-  BytesBuilder writeUnsignedVarint(int value, BytesBuilder buffer) {
-    if ((value & (0xFFFFFFFF << 7)) == 0) {
-      buffer.add(uint8(value));
-    } else {
-      buffer.add((uint8(value & 0x7F | 0x80)));
-      if ((value & (0xFFFFFFFF << 14)) == 0) {
-        buffer.add(uint8((value >>> 7) & 0xFF));
-      } else {
-        buffer.add(uint8((value >>> 7) & 0x7F | 0x80));
-        if ((value & (0xFFFFFFFF << 21)) == 0) {
-          buffer.add(uint8((value >>> 14)  & 0xFF));
-        } else {
-          buffer.add(uint8((value >>> 14) & 0x7F | 0x80));
-          if ((value & (0xFFFFFFFF << 28)) == 0) {
-            buffer.add(uint8((value >>> 21)  & 0xFF));
-          } else {
-            buffer.add(uint8((value >>> 21) & 0x7F | 0x80));
-            buffer.add(uint8((value >>> 28) & 0xFF));
-          }
-        }
-      }
-    }
-
-    return buffer;
-  }
-
-  BytesBuilder writeVarlong(int value, BytesBuilder buffer) {
-    return writeUnsignedVarlong((value << 1) ^ (value >> 63), buffer);
-  }
-
-  BytesBuilder writeUnsignedVarlong(int value, BytesBuilder buffer) {
-    ByteData? data = ByteData(1);
-    int? offset = 0;
-    while ((value & 0xffffffffffffff80) != 0) {
-      final byte = (value & 0x7f) | 0x80;
-      data.setUint8(offset!, byte);
-      offset++;
-      value >>>= 7;
-    }
-    data.setInt8(offset!, value);
-    buffer.add(data.buffer.asUint8List());
-
-    offset = null;
-    data = null;
-    return buffer;
-  }
-
-  Uint8List string(String value) {
-    final bytes = utf8.encode(value);
-    return Uint8List.fromList([...int16(bytes.length), ...bytes]);
-  }
-
-  Uint8List nullableString(String? value) {
-    if (value == null) {
-      return Uint8List.fromList([255, 255]);
-    }
-    return string(value);
-  }
-
-  Uint8List compactString(String value) {
-    final bytes = utf8.encode(value);
-    final length = encodeUnsignedVarint(bytes.length + 1);
-    return Uint8List.fromList([...length, ...bytes]);
-  }
-
-  Uint8List compactNullableString(String? value) {
-    if (value == null) {
-      return Uint8List.fromList([0]);
-    }
-    return compactString(value);
-  }
-
-  Uint8List compactBytes(Uint8List value) {
-    final length = encodeUnsignedVarint(value.length + 1);
-    return Uint8List.fromList([...length, ...value]);
-  }
-
-  Uint8List compactArrayLength(int length) {
-    return encodeUnsignedVarint(length <= 0 ? 0 : length + 1);
-  }
-
-  Uint8List tagBuffer() {
-    return Uint8List(0);
-  }
-
-  /// Generate a random CorrelationID
   int generateCorrelationId() {
     final Random random = Random();
     int value = random.nextInt(1 << 32);
     return value - (1 << 31); // Convert to signed int32 range
+  }
+
+  bool canRead(
+      {required int currentOffset,
+      required int amountOfBytes,
+      required List<int> data}) {
+    return data.length >= (currentOffset + amountOfBytes);
   }
 
   ({int value, int bytesRead}) readVarint(List<int> byteArray, int offset,
@@ -218,23 +83,6 @@ class Utils {
     }
 
     return (value: value, bytesRead: bytesRead);
-  }
-
-  bool canRead(
-      {required int currentOffset,
-      required int amountOfBytes,
-      required List<int> data}) {
-    return data.length >= (currentOffset + amountOfBytes);
-  }
-
-  Uint8List encodeUnsignedVarint(int value) {
-    final bytes = <int>[];
-    while (value > 0x7F) {
-      bytes.add((value & 0x7F) | 0x80);
-      value >>= 7;
-    }
-    bytes.add(value);
-    return Uint8List.fromList(bytes);
   }
 
   ({String value, int bytesRead}) readCompactString(
@@ -405,8 +253,4 @@ class Utils {
     }
     return count;
   }
-
-  
 }
-
-

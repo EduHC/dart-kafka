@@ -2,31 +2,33 @@ import 'dart:typed_data';
 
 import 'package:dart_kafka/src/models/components/api_version.dart';
 import 'package:dart_kafka/src/models/responses/api_version_response.dart';
+import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 
 class KafkaVersionApi {
   final int apiKey = API_VERSIONS;
   final Utils utils = Utils();
+  final Encoder encoder = Encoder();
 
   /// Serialize the ApiVersionRequest to Byte
   Uint8List serialize(
       {required int correlationId, String? clientId, required int apiVersion}) {
     final byteBuffer = BytesBuilder();
-    byteBuffer.add(utils.int16(apiKey));
-    byteBuffer.add(utils.int16(apiVersion));
-    byteBuffer.add(utils.int32(correlationId));
+    byteBuffer.add(encoder.int16(apiKey));
+    byteBuffer.add(encoder.int16(apiVersion));
+    byteBuffer.add(encoder.int32(correlationId));
 
     if (clientId != null) {
       final clientIdBytes = clientId!.codeUnits;
-      byteBuffer.add(utils.int16(clientIdBytes.length));
+      byteBuffer.add(encoder.int16(clientIdBytes.length));
       byteBuffer.add(clientIdBytes);
     } else {
-      byteBuffer.add(utils.int16(-1));
+      byteBuffer.add(encoder.int16(-1));
     }
 
     Uint8List message = byteBuffer.toBytes();
-    return Uint8List.fromList([...utils.int32(message.length), ...message]);
+    return Uint8List.fromList([...encoder.int32(message.length), ...message]);
   }
 
   /// Deserializes the ApiVersionResponse from a byte array.

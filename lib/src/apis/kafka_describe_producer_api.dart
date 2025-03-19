@@ -4,9 +4,9 @@ import 'package:dart_kafka/src/models/components/active_producer.dart';
 import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/responses/describe_producer_response.dart';
 import 'package:dart_kafka/src/models/topic.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/errors.dart';
+import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaDescribeProducerApi {
@@ -27,19 +27,20 @@ class KafkaDescribeProducerApi {
       throw Exception("No topics informed for DescribeProducer");
     }
 
-    byteBuffer.add(utils.compactArrayLength(topics.length));
+    byteBuffer.add(encoder.compactArrayLength(topics.length));
     for (int i = 0; i < topics.length; i++) {
-      byteBuffer.add(utils.compactString(topics[i].topicName));
-      byteBuffer.add(utils.compactArrayLength(topics[i].partitions?.length ?? 0));
+      byteBuffer.add(encoder.compactString(topics[i].topicName));
+      byteBuffer
+          .add(encoder.compactArrayLength(topics[i].partitions?.length ?? 0));
       for (int j = 0; j < (topics[i].partitions?.length ?? 0); j++) {
-        byteBuffer.add(utils.int32(topics[i].partitions![j].id));
+        byteBuffer.add(encoder.int32(topics[i].partitions![j].id));
       }
       // add _tagged_field
-      byteBuffer.add(utils.int8(0));
+      byteBuffer.add(encoder.int8(0));
     }
 
     // add _tagged_field
-    byteBuffer.add(utils.int8(0));
+    byteBuffer.add(encoder.int8(0));
     final message = byteBuffer.toBytes();
     byteBuffer.clear();
 
@@ -128,7 +129,8 @@ class KafkaDescribeProducerApi {
             id: partitionId,
             activeProducers: activeProducers,
             errorCode: errorCode,
-            errorMessage: errorMessage.value ?? ERROR_MAP[errorCode]));
+            errorMessage: errorMessage.value ??
+                (ERROR_MAP[errorCode] as Map)['message']));
       }
 
       topics.add(Topic(topicName: topicName.value, partitions: partitions));

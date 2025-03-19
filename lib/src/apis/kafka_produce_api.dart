@@ -5,14 +5,15 @@ import 'package:dart_kafka/src/models/components/record_error.dart';
 import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/responses/produce_response.dart';
 import 'package:dart_kafka/src/models/topic.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/errors.dart';
+import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaProduceApi {
   final int apiKey = PRODUCE; // ProduceRequest API key
   final Utils utils = Utils();
+  final Encoder encoder = Encoder();
 
   /// Serialize the ProduceRequest
   Uint8List serialize(
@@ -31,30 +32,29 @@ class KafkaProduceApi {
       required int batchOffset,
       required int partitionLeaderEpoch}) {
     BytesBuilder byteBuffer = BytesBuilder();
-    Encoder encoder = Encoder();
 
     if (apiVersion >= 9) {
-      byteBuffer.add(utils.compactNullableString(transactionalId));
+      byteBuffer.add(encoder.compactNullableString(transactionalId));
     } else {
-      byteBuffer.add(utils.nullableString(transactionalId));
+      byteBuffer.add(encoder.nullableString(transactionalId));
     }
 
-    byteBuffer.add(utils.int16(acks));
-    byteBuffer.add(utils.int32(timeoutMs));
+    byteBuffer.add(encoder.int16(acks));
+    byteBuffer.add(encoder.int32(timeoutMs));
 
     if (apiVersion >= 9) {
-      byteBuffer.add(utils.compactArrayLength(topics.length));
+      byteBuffer.add(encoder.compactArrayLength(topics.length));
     } else {
-      byteBuffer.add(utils.int32(topics.length));
+      byteBuffer.add(encoder.int32(topics.length));
     }
 
     for (final topic in topics) {
       if (apiVersion >= 9) {
-        byteBuffer.add(utils.compactString(topic.topicName));
-        byteBuffer.add(utils.compactArrayLength(topic.partitions?.length ?? 0));
+        byteBuffer.add(encoder.compactString(topic.topicName));
+        byteBuffer.add(encoder.compactArrayLength(topic.partitions?.length ?? 0));
       } else {
-        byteBuffer.add(utils.string(topic.topicName));
-        byteBuffer.add(utils.int32(topic.partitions?.length ?? 0));
+        byteBuffer.add(encoder.string(topic.topicName));
+        byteBuffer.add(encoder.int32(topic.partitions?.length ?? 0));
       }
 
       for (Partition partition in topic.partitions ?? []) {
@@ -67,7 +67,7 @@ class KafkaProduceApi {
               "The batch of the partition ${partition.id} has null records");
         }
 
-        byteBuffer.add(utils.int32(partition.id));
+        byteBuffer.add(encoder.int32(partition.id));
         final Uint8List recordBatch = encoder.writeRecordBatch(
             records: partition.batch!.records!,
             producerId: producerId,
@@ -78,8 +78,8 @@ class KafkaProduceApi {
             batchOffset: batchOffset,
             partitionLeaderEpoch: partitionLeaderEpoch);
 
-        byteBuffer = utils.writeUnsignedVarint(recordBatch.length + 1,
-            byteBuffer); // adding the size of the RecordBatch
+        // byteBuffer = encoder.writeUnsignedVarint(recordBatch.length + 1); // adding the size of the RecordBatch
+        byteBuffer.add(encoder.writeUnsignedVarint(recordBatch.length + 1));
         byteBuffer.add(recordBatch);
       }
     }
@@ -170,7 +170,7 @@ class KafkaProduceApi {
           Partition(
               id: partition,
               errorCode: errorCode,
-              errorMessage: errorMessage.value ?? ERROR_MAP[errorCode],
+              errorMessage: errorMessage.value ?? (ERROR_MAP[errorCode] as Map)['message'],
               baseOffset: baseOffset,
               logAppendTimeMs: logAppendTime,
               logStartOffset: logStartOffset,

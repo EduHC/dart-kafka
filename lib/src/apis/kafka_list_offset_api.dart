@@ -2,9 +2,9 @@ import 'dart:typed_data';
 
 import 'package:dart_kafka/dart_kafka.dart';
 import 'package:dart_kafka/src/models/responses/list_offset_response.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/errors.dart';
+import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaListOffsetApi {
@@ -25,39 +25,39 @@ class KafkaListOffsetApi {
   }) {
     final byteBuffer = BytesBuilder();
 
-    byteBuffer.add(utils.int32(replicaId));
+    byteBuffer.add(encoder.int32(replicaId));
     if (apiVersion > 1) {
-      byteBuffer.add(utils.int8(isolationLevel));
+      byteBuffer.add(encoder.int8(isolationLevel));
     }
-    byteBuffer.add(utils.compactArrayLength(topics.length));
+    byteBuffer.add(encoder.compactArrayLength(topics.length));
 
     for (Topic topic in topics) {
       if (apiVersion > 5) {
-        byteBuffer.add(utils.compactString(topic.topicName));
+        byteBuffer.add(encoder.compactString(topic.topicName));
       } else {
-        byteBuffer.add(utils.string(topic.topicName));
+        byteBuffer.add(encoder.string(topic.topicName));
       }
-      byteBuffer.add(utils.compactArrayLength(topic.partitions?.length ?? 0));
+      byteBuffer.add(encoder.compactArrayLength(topic.partitions?.length ?? 0));
 
       for (Partition partition in topic.partitions ?? []) {
-        byteBuffer.add(utils.int32(partition.id));
+        byteBuffer.add(encoder.int32(partition.id));
         if (apiVersion > 3) {
           // TODO: aqui preciso fazer a request LeaderAndIsr and pass the value
-          byteBuffer.add(utils.int32(leaderEpoch));
+          byteBuffer.add(encoder.int32(leaderEpoch));
         }
-        byteBuffer.add(utils.int64(DateTime.now().microsecondsSinceEpoch));
+        byteBuffer.add(encoder.int64(DateTime.now().microsecondsSinceEpoch));
         if (apiVersion == 0) {
-          byteBuffer.add(utils.int32(limit));
+          byteBuffer.add(encoder.int32(limit));
         }
         if (apiVersion > 5) {
-          byteBuffer.add(utils.int8(0));
+          byteBuffer.add(encoder.int8(0));
         }
       }
 
-      if (apiVersion > 5) byteBuffer.add(utils.int8(0));
+      if (apiVersion > 5) byteBuffer.add(encoder.int8(0));
     }
 
-    if (apiVersion > 5) byteBuffer.add(utils.int8(0));
+    if (apiVersion > 5) byteBuffer.add(encoder.int8(0));
 
     final message = byteBuffer.toBytes();
     byteBuffer.clear();
@@ -117,7 +117,7 @@ class KafkaListOffsetApi {
           Partition(
             id: id,
             errorCode: errorCode,
-            errorMessage: (ERROR_MAP2[errorCode] as Map)['message'],
+            errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
             timestamp: timestamp,
             offset: pOffset,
             leaderEpoch: leaderEpoch,

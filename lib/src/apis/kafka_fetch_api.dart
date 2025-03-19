@@ -7,12 +7,14 @@ import 'package:dart_kafka/src/models/components/record_header.dart';
 import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/responses/fetch_response.dart';
 import 'package:dart_kafka/src/models/topic.dart';
+import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 
 class KafkaFetchApi {
   final int apiKey = FETCH;
   Utils utils = Utils();
+  final Encoder encoder = Encoder();
 
   /// Method to serialize to build and serialize the FetchRequest to Byte Array
   Uint8List serialize({
@@ -28,61 +30,62 @@ class KafkaFetchApi {
   }) {
     final byteBuffer = BytesBuilder();
 
-    byteBuffer.add(utils.int16(apiKey));
-    byteBuffer.add(utils.int16(apiVersion));
-    byteBuffer.add(utils.int32(correlationId));
+    byteBuffer.add(encoder.int16(apiKey));
+    byteBuffer.add(encoder.int16(apiVersion));
+    byteBuffer.add(encoder.int32(correlationId));
 
     if (clientId != null) {
       final clientIdBytes = clientId.codeUnits;
-      byteBuffer.add(utils.int16(clientIdBytes.length));
+      byteBuffer.add(encoder.int16(clientIdBytes.length));
       byteBuffer.add(clientIdBytes);
     } else {
-      byteBuffer.add(utils.int16(-1));
+      byteBuffer.add(encoder.int16(-1));
     }
 
-    byteBuffer.add(utils.int32(replicaId ?? -1));
-    byteBuffer.add(utils.int32(maxWaitMs ?? 30000));
-    byteBuffer.add(utils.int32(minBytes ?? 1));
-    byteBuffer.add(utils.int32(maxBytes ?? 10000));
+    byteBuffer.add(encoder.int32(replicaId ?? -1));
+    byteBuffer.add(encoder.int32(maxWaitMs ?? 30000));
+    byteBuffer.add(encoder.int32(minBytes ?? 1));
+    byteBuffer.add(encoder.int32(maxBytes ?? 10000));
 
     // Add isolation level (0 = read_uncommitted, 1 = read_committed)
-    byteBuffer.add(utils.int8(isolationLevel));
+    byteBuffer.add(encoder.int8(isolationLevel));
 
     // Add session ID and epoch (only for versions >= 7)
     if (apiVersion >= 7) {
-      byteBuffer.add(utils.int32(0)); // Session ID (default to 0)
-      byteBuffer.add(utils.int32(0)); // Session epoch (default to 0)
+      byteBuffer.add(encoder.int32(0)); // Session ID (default to 0)
+      byteBuffer.add(encoder.int32(0)); // Session epoch (default to 0)
     }
 
     // Add topics to fetch
-    byteBuffer.add(utils.int32(topics.length));
+    byteBuffer.add(encoder.int32(topics.length));
     for (final topic in topics) {
       final topicNameBytes = topic.topicName.codeUnits;
-      byteBuffer.add(utils.int16(topicNameBytes.length));
+      byteBuffer.add(encoder.int16(topicNameBytes.length));
       byteBuffer.add(topicNameBytes);
 
-      byteBuffer.add(utils.int32(topic.partitions!.length));
+      byteBuffer.add(encoder.int32(topic.partitions!.length));
       for (final partition in topic.partitions!) {
-        byteBuffer.add(utils.int32(partition.id));
-        byteBuffer.add(utils.int64(partition.fetchOffset ?? 0));
-        byteBuffer.add(utils.int64(partition.logStartOffset ?? 0)); // Log start offset (only for versions >= 5)
-        byteBuffer.add(utils.int32(partition.maxBytes ?? 45));
+        byteBuffer.add(encoder.int32(partition.id));
+        byteBuffer.add(encoder.int64(partition.fetchOffset ?? 0));
+        byteBuffer.add(encoder.int64(partition.logStartOffset ??
+            0)); // Log start offset (only for versions >= 5)
+        byteBuffer.add(encoder.int32(partition.maxBytes ?? 45));
       }
     }
 
     // Add forgotten topics (only for versions >= 7)
     if (apiVersion >= 7) {
       byteBuffer
-          .add(utils.int32(0)); // Number of forgotten topics (default to 0)
+          .add(encoder.int32(0)); // Number of forgotten topics (default to 0)
     }
 
     // Add rack ID (only for versions >= 11)
     if (apiVersion >= 11) {
-      byteBuffer.add(utils.int16(-1)); // Rack ID (default to null)
+      byteBuffer.add(encoder.int16(-1)); // Rack ID (default to null)
     }
 
     Uint8List message = byteBuffer.toBytes();
-    return Uint8List.fromList([...utils.int32(message.length), ...message]);
+    return Uint8List.fromList([...encoder.int32(message.length), ...message]);
   }
 
   /// Method to deserialize the FetchResponse from a Byte Array

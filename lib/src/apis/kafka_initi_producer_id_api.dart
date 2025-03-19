@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:dart_kafka/src/models/responses/init_producer_id_response.dart';
-import 'package:dart_kafka/src/protocol/apis.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/errors.dart';
+import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaInitProducerIdApi {
@@ -24,20 +24,20 @@ class KafkaInitProducerIdApi {
     BytesBuilder buffer = BytesBuilder();
 
     if (apiVersion < 2) {
-      buffer.add(utils.nullableString(transactionalId));
+      buffer.add(encoder.nullableString(transactionalId));
     } else {
-      buffer.add(utils.compactNullableString(transactionalId));
+      buffer.add(encoder.compactNullableString(transactionalId));
     }
 
-    buffer.add(utils.int32(transactionTimeoutMs));
+    buffer.add(encoder.int32(transactionTimeoutMs));
 
     if (apiVersion > 2) {
-      buffer.add(utils.int64(producerId));
-      buffer.add(utils.int16(producerEpoch));
+      buffer.add(encoder.int64(producerId));
+      buffer.add(encoder.int16(producerEpoch));
     }
 
     if (apiVersion > 1) {
-      buffer.add(utils.int8(0)); // _tagged_fields
+      buffer.add(encoder.int8(0)); // _tagged_fields
     }
 
     var message = buffer.toBytes();
@@ -76,7 +76,7 @@ class KafkaInitProducerIdApi {
     return InitProducerIdResponse(
         throttleTimeMs: throttleTimeMs,
         errorCode: errorCode,
-        errorMessage: ERROR_MAP[errorCode] ?? '',
+        errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
         producerId: producerId,
         producerEpoch: producerEpoch,
         taggedFields: taggedFields);
