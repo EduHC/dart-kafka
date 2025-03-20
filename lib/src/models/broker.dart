@@ -1,15 +1,10 @@
 class Broker {
-  final int nodeId;
+  final int? nodeId;
   final String host;
   final int port;
   String? rack;
 
-  Broker({
-    required this.nodeId,
-    required this.host,
-    required this.port,
-    this.rack
-  });
+  Broker({this.nodeId, required this.host, required this.port, this.rack});
 
   @override
   String toString() {
