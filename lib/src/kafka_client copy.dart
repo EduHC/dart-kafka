@@ -34,6 +34,8 @@ class KafkaClient {
   }
 
   Future<void> connect() async {
+    if (started) return;
+    started = true;
     cluster.connect(responseHanddler: _handleResponse);
   }
 
@@ -43,6 +45,7 @@ class KafkaClient {
       continue;
     }
     print("Fechou");
+    cluster.close();
     _subscription?.cancel();
     _subscription = null;
   }

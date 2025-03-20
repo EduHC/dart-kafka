@@ -29,10 +29,10 @@ class KafkaCluster {
   }
 
   Socket getBrokerById(int id) {
-    if (!_sockets.containsKey(id)) {
+    if (!_sockets.containsKey(id.toString())) {
       throw Exception("Requested Broker not found!");
     }
-    return _sockets[id]!;
+    return _sockets[id.toString()]!;
   }
 
   Future<void> closeBroker({required brokerId}) async {
@@ -54,15 +54,39 @@ class KafkaCluster {
             _sockets.addAll({key: sock});
 
             Future.microtask(() {
-              StreamSubscription subscription = sock.listen((event) => responseHanddler(event),);
+              StreamSubscription subscription = sock.listen(
+                (event) => responseHanddler(event),
+              );
               _subscriptions.add(subscription);
-            }); 
-            
+            });
           }
         } catch (e) {
           throw Exception("Error trying to connect to informed host: $e");
         }
       },
     );
+  }
+
+  void close() {
+    _sockets.forEach(
+      (key, value) => value.close,
+    );
+    _subscriptions.map(
+      (element) => element.cancel,
+    );
+    _sockets.clear();
+    _topics.clear();
+    _brokers.clear();
+    _subscriptions.clear();
+  }
+
+  Socket? getLeaderBroker(String topic) {
+    final KafkaTopicMetadata metadata = _topics.firstWhere(
+      (element) => element.topicName == topic,
+    );
+
+    for (KafkaPartitionMetadata pMetadata in metadata.partitions) {}
+
+    return null;
   }
 }
