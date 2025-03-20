@@ -1,0 +1,140 @@
+{
+  "MetadataResponse": {
+    "throttleTimeMs": 0,
+    "controllerId": 4,
+    "clusterId": "5L6g3nShT-eMCtK--X86sw",
+    "leaderEpoch": null,
+    "clusterAuthorizedOperations": -2147483648,
+    "topicAuthorizedOperations": null,
+    "BrokersMetada": [
+      {
+        "nodeId": 4,
+        "host": "192.168.200.131",
+        "port": 29092,
+        "rack": null
+      },
+      {
+        "nodeId": 5,
+        "host": "192.168.200.131",
+        "port": 29093,
+        "rack": null
+      },
+      {
+        "nodeId": 6,
+        "host": "192.168.200.131",
+        "port": 29094,
+        "rack": null
+      }
+    ],
+    "TopicMetadata": [
+      {
+        "topicName": "testeomnilightvitaverse.status",
+        "isInternal": false,
+        "topicAuthorizedOperations": -2147483648,
+        "errorCode": 0,
+        "partitions": [
+          {
+            "partitionId": 0,
+            "leaderId": 6,
+            "errorCode": 0,
+            "errorMessage": null,
+            "replicas": [],
+            "inSyncReplicas": [6],
+            "offlineReplicas": [],
+            "leaderEpoch": 0
+          }
+        ]
+      },
+      {
+        "topicName": "testeomnilightvitaverse.api_logs",
+        "isInternal": false,
+        "topicAuthorizedOperations": -2147483648,
+        "errorCode": 0,
+        "partitions": [
+          {
+            "partitionId": 0,
+            "leaderId": 4,
+            "errorCode": 0,
+            "errorMessage": null,
+            "replicas": [],
+            "inSyncReplicas": [4],
+            "offlineReplicas": [],
+            "leaderEpoch": 0
+          }
+        ]
+      },
+      {
+        "topicName": "testeomnilightvitaverse.machine_logs",
+        "isInternal": false,
+        "topicAuthorizedOperations": -2147483648,
+        "errorCode": 0,
+        "partitions": [
+          {
+            "partitionId": 0,
+            "leaderId": 4,
+            "errorCode": 0,
+            "errorMessage": null,
+            "replicas": [],
+            "inSyncReplicas": [4],
+            "offlineReplicas": [],
+            "leaderEpoch": 0
+          }
+        ]
+      },
+      {
+        "topicName": "testeomnilightvitaverse.machine_config",
+        "isInternal": false,
+        "topicAuthorizedOperations": -2147483648,
+        "errorCode": 0,
+        "partitions": [
+          {
+            "partitionId": 0,
+            "leaderId": 6,
+            "errorCode": 0,
+            "errorMessage": null,
+            "replicas": [],
+            "inSyncReplicas": [6],
+            "offlineReplicas": [],
+            "leaderEpoch": 0
+          }
+        ]
+      },
+      {
+        "topicName": "testeomnilightvitaverse.location",
+        "isInternal": false,
+        "topicAuthorizedOperations": -2147483648,
+        "errorCode": 0,
+        "partitions": [
+          {
+            "partitionId": 0,
+            "leaderId": 6,
+            "errorCode": 0,
+            "errorMessage": null,
+            "replicas": [],
+            "inSyncReplicas": [6],
+            "offlineReplicas": [],
+            "leaderEpoch": 0
+          }
+        ]
+      },
+      {
+        "topicName": "testeomnilightvitaverse.sensor",
+        "isInternal": false,
+        "topicAuthorizedOperations": -2147483648,
+        "errorCode": 0,
+        "partitions": [
+          {
+            "partitionId": 0,
+            "leaderId": 4,
+            "errorCode": 0,
+            "errorMessage": null,
+            "replicas": [],
+            "inSyncReplicas": [4],
+            "offlineReplicas": [],
+            "leaderEpoch": 0
+          }
+        ]
+      }
+    ]
+  }
+}

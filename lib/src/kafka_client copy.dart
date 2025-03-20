@@ -11,42 +11,30 @@ import 'package:dart_kafka/src/protocol/utils.dart';
 import 'package:dart_kafka/src/definitions/types.dart';
 
 class KafkaClient {
-  late Socket? _socket;
-  final String host;
-  final int port;
   late final ResponseController responseController;
   late final RequestController requestController;
   late StreamSubscription? _subscription;
   final StreamController _eventController = StreamController();
   final KafkaCluster cluster = KafkaCluster();
-  final List<Broker> brokers = [];
   final Utils utils = Utils();
   final Encoder encoder = Encoder();
 
   Stream get eventStream => _eventController.stream.asBroadcastStream();
-  Socket? get server => _socket;
 
   bool started = false;
   bool consumerStarted = false;
   bool producerStarted = false;
   bool adminStarted = false;
 
-  KafkaClient({required this.host, required this.port}) {
+  /// @Parameter brokers
+  ///    A list containing only the Host Address and the Port to access N Kafka Brokers
+  KafkaClient({required List<Broker> brokers}) {
+    cluster.setBrokers(brokers);
     responseController = ResponseController(eventController: _eventController);
   }
 
   Future<void> connect() async {
-    _socket = await Socket.connect(host, port);
-    if (_socket == null) throw Exception("Server hasn't connected");
-
-    started = true;
-    _socket!.setOption(SocketOption.tcpNoDelay, true);
-    requestController = RequestController(server: _socket!);
-    Future.microtask(() {
-      _subscription = _socket!.listen(
-        (event) => _handleResponse(event),
-      );
-    });
+    cluster.connect(responseHanddler: _handleResponse);
   }
 
   Future<void> close() async {
@@ -56,10 +44,7 @@ class KafkaClient {
     }
     print("Fechou");
     _subscription?.cancel();
-    _socket?.close();
-    _socket?.destroy();
     _subscription = null;
-    _socket = null;
   }
 
   void _handleResponse(Uint8List response) {

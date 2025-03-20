@@ -2,7 +2,8 @@ import 'package:dart_kafka/dart_kafka.dart';
 
 void main() async {
   // final KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
-  final KafkaClient kafka = KafkaClient(host: '192.168.4.163', port: 29092);
+  // final KafkaClient kafka = KafkaClient(host: '192.168.4.163', port: 29092);
+  final KafkaClient kafka = KafkaClient(host: '192.168.200.131', port: 29092);
   await kafka.connect();
 
   if (kafka.server == null) {
@@ -10,16 +11,33 @@ void main() async {
     return;
   }
 
-  // TESTING THE ADMIN COMMANDS
-  // KafkaAdmin admin = KafkaAdmin(kafka: kafka);
-  // dynamic res = await admin.sendApiVersionRequest(
-  //     apiVersion: 0, clientId: 'test', async: true);
-
   Future.microtask(
     () => kafka.eventStream.listen(
       (event) => print("Received from Stream: $event"),
     ),
   );
+
+  // TESTING THE ADMIN COMMANDS
+  KafkaAdmin admin = KafkaAdmin(kafka: kafka);
+  // dynamic res = await admin.sendApiVersionRequest(
+  //     apiVersion: 2, clientId: 'test', async: true);
+
+  await admin.sendMetadataRequest(
+      apiVersion: 9,
+      async: true,
+      correlationId: null,
+      clientId: 'dart-kafka',
+      allowAutoTopicCreation: true,
+      includeClusterAuthorizedOperations: true,
+      includeTopicAuthorizedOperations: true,
+      topics: [
+        'testeomnilightvitaverse.location',
+        'testeomnilightvitaverse.sensor',
+        'testeomnilightvitaverse.status',
+        'testeomnilightvitaverse.machine_config',
+        'testeomnilightvitaverse.machine_logs',
+        'testeomnilightvitaverse.api_logs',
+      ]);
 
   print("");
   print("");
@@ -33,21 +51,20 @@ void main() async {
   //     apiVersion: 12);
 
   // TESTING THE CONSUMER COMMANDS
-  KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
-  List<Topic> topics = [
-    Topic(
-        topicName: 'testeomnilightvitaverse.machine_config',
-        partitions: [Partition(id: 0, fetchOffset: 11)]),
-    // Topic(topicName: 'testeomnilightvitaverse.sensors', partitions: [Partition(id: 0)]),
-  ];
-  var res = await consumer.sendFetchRequest(
-      clientId: 'testeomnilightvitaverse',
-      topics: topics,
-      isolationLevel: 0,
-      apiVersion: 8,
-      async: false);
-
-  print("$res");
+  // KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
+  // List<Topic> topics = [
+  //   Topic(
+  //       topicName: 'testeomnilightvitaverse.machine_config',
+  //       partitions: [Partition(id: 0, fetchOffset: 11)]),
+  //   // Topic(topicName: 'testeomnilightvitaverse.sensors', partitions: [Partition(id: 0)]),
+  // ];
+  // var res = await consumer.sendFetchRequest(
+  //     clientId: 'testeomnilightvitaverse',
+  //     topics: topics,
+  //     isolationLevel: 0,
+  //     apiVersion: 8,
+  //     async: false);
+  // print("$res");
 
   // topics = [
   //   // Topic(topicName: 'testeomnilightvitaverse.status', partitions: [Partition(id: 0)]),
@@ -66,7 +83,6 @@ void main() async {
   //   apiVersion: 9,
   //   async: false,
   // );
-
   // print("$res");
 
   // List<Protocol> protocols = [
@@ -90,6 +106,7 @@ void main() async {
   //     reason: 'Testing');
 
   // TESTING THE PRODUCER COMMANDS
+  // topics.clear();
   KafkaProducer producer = KafkaProducer(kafka: kafka);
 
   // await producer.initProduceId(
@@ -97,9 +114,8 @@ void main() async {
   //     clientId: 'dart-kafka',
   //     apiVersion: 5,
   //     transactionTimeoutMs: 1500,
-  //     producerId: 1,
+  //     producerId: -1,
   //     producerEpoch: 0);
-  // List<Topic> topics = List.empty(growable: true);
   // List<Partition> partitions = List.empty(growable: true);
   // List<Record> records = List.empty(growable: true);
   // List<RecordHeader> headers = List.empty(growable: true);
@@ -122,7 +138,7 @@ void main() async {
   //     key: null,
   //     value: '{\'deutsch\': \'land\'}'));
   // RecordBatch batch = RecordBatch(
-  //   producerId: 27,
+  //   producerId: -1,
   //   partitionLeaderEpoch: -1,
   //   attributes: 0,
   //   baseOffset: 0,
@@ -132,7 +148,7 @@ void main() async {
   //   records: records,
   // );
   // partitions.add(Partition(id: 0, batch: batch));
-  // topics.add(Topic(topicName: 'test-topic', partitions: partitions));
+  // topics.add(Topic(topicName: 'testeomnilightvitaverse.machine_config', partitions: partitions));
   // await producer.produce(
   //     acks: -1,
   //     timeoutMs: 1500,
