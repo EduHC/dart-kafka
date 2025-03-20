@@ -1,6 +1,11 @@
 import 'dart:typed_data';
 
 class Decoder {
+  bool readBool(ByteData buffer, int offset) {
+    final value = buffer.getInt8(offset);
+    return value > 0 ? true : false;
+  }
+
   ({int value, int bytesRead}) readVarint(List<int> byteArray, int offset,
       {bool signed = true}) {
     int value = 0;
