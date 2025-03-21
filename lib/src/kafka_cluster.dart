@@ -6,9 +6,45 @@ import 'package:dart_kafka/dart_kafka.dart';
 
 class KafkaCluster {
   final Set<Broker> _brokers = {};
-  final Set<KafkaTopicMetadata> _topics = {};
+  // {'testeomnilightvitaverse.location': '192.168.200.31:29092'}
+  final HashMap<String, Map<int, String>> _topicsBrokers = HashMap();
+  // {'192.168.200.31:29092': Socket::class}
   final HashMap<String, Socket> _sockets = HashMap();
   final Set<StreamSubscription> _subscriptions = {};
+
+  Future<void> connect({required Function responseHandler}) async {
+    for (Broker broker in _brokers) {
+      try {
+        String key = "${broker.host}:${broker.port}";
+
+        if (_sockets.containsKey(key)) continue;
+        Socket sock = await Socket.connect(broker.host, broker.port);
+        _sockets.addAll({key: sock});
+      } catch (e) {
+        throw Exception("Error trying to connect to informed host: $e");
+      }
+    }
+
+    for (Socket sock in _sockets.values) {
+      StreamSubscription subscription = sock.listen(
+        (event) => responseHandler(event),
+      );
+      _subscriptions.add(subscription);
+    }
+  }
+
+  void close() {
+    _sockets.forEach(
+      (key, value) => value.close,
+    );
+    _subscriptions.map(
+      (element) => element.cancel,
+    );
+    _sockets.clear();
+    _topicsBrokers.clear();
+    _brokers.clear();
+    _subscriptions.clear();
+  }
 
   void addBroker(Broker broker) {
     _brokers.add(broker);
@@ -17,22 +53,6 @@ class KafkaCluster {
   void setBrokers(List<Broker> brokers) {
     _brokers.clear();
     _brokers.addAll(brokers);
-  }
-
-  void addTopic(KafkaTopicMetadata topic) {
-    _topics.add(topic);
-  }
-
-  void setTopics(List<KafkaTopicMetadata> topics) {
-    _topics.clear();
-    _topics.addAll(topics);
-  }
-
-  Socket getBrokerById(int id) {
-    if (!_sockets.containsKey(id.toString())) {
-      throw Exception("Requested Broker not found!");
-    }
-    return _sockets[id.toString()]!;
   }
 
   Future<void> closeBroker({required brokerId}) async {
@@ -44,49 +64,50 @@ class KafkaCluster {
     _sockets.remove(brokerId);
   }
 
-  Future<void> connect({required Function responseHanddler}) async {
-    _brokers.map(
-      (Broker broker) async {
-        try {
-          String key = "${broker.host}:${broker.port}";
-          if (!_sockets.containsKey(key)) {
-            Socket sock = await Socket.connect(broker.host, broker.port);
-            _sockets.addAll({key: sock});
+  Socket getBrokerForPartition(
+      {required String topic, required int partition}) {
+    if (!_topicsBrokers.containsKey(topic)) {
+      throw Exception("Topic not found in the Cluster! $topic");
+    }
 
-            Future.microtask(() {
-              StreamSubscription subscription = sock.listen(
-                (event) => responseHanddler(event),
-              );
-              _subscriptions.add(subscription);
-            });
+    String? brokerRoute = (_topicsBrokers[topic] as Map)[partition];
+
+    if (brokerRoute == null || brokerRoute.isEmpty) {
+      throw Exception(
+          "Not found Broker Host and Port for topic $topic and partition $partition");
+    }
+
+    if (!_sockets.containsKey(brokerRoute)) {
+      throw Exception(
+          "Socket ${_topicsBrokers[topic]} not found for the topic $topic");
+    }
+
+    return _sockets[brokerRoute]!;
+  }
+
+  Socket getAnyBroker() {
+    if (_sockets.isEmpty) {
+      throw Exception("No Brokers available!");
+    }
+    return _sockets.values.first;
+  }
+
+  void updateTopicsBroker({required MetadataResponse metadata}) {
+    Map? brokers = {
+      for (var b in metadata.brokers) b.nodeId: "${b.host}:${b.port}"
+    };
+
+    for (KafkaTopicMetadata topic in metadata.topics) {
+      for (KafkaPartitionMetadata partition in topic.partitions) {
+        _topicsBrokers.addAll({
+          topic.topicName: {
+            partition.partitionId: "${brokers[partition.leaderId]}"
           }
-        } catch (e) {
-          throw Exception("Error trying to connect to informed host: $e");
-        }
-      },
-    );
-  }
+        });
+      }
+    }
 
-  void close() {
-    _sockets.forEach(
-      (key, value) => value.close,
-    );
-    _subscriptions.map(
-      (element) => element.cancel,
-    );
-    _sockets.clear();
-    _topics.clear();
-    _brokers.clear();
-    _subscriptions.clear();
-  }
-
-  Socket? getLeaderBroker(String topic) {
-    final KafkaTopicMetadata metadata = _topics.firstWhere(
-      (element) => element.topicName == topic,
-    );
-
-    for (KafkaPartitionMetadata pMetadata in metadata.partitions) {}
-
-    return null;
+    brokers.clear();
+    brokers = null;
   }
 }

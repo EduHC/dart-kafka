@@ -11,6 +11,7 @@ export './responses/init_producer_id_response.dart';
 export './responses/join_group_response.dart';
 export './responses/metadata_response.dart';
 export './responses/produce_response.dart';
+export './responses/list_offset_response.dart';
 
 // Metadata Model
 export './metadata/kafka_partition_metadata.dart';

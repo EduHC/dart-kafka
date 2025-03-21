@@ -5,17 +5,19 @@ import 'dart:typed_data';
 
 class RequestController {
   final Queue<_QueuedRequest> _requestQueue = Queue();
-  final Socket server;
 
-  RequestController({required this.server});
+  RequestController();
+
+  bool get hasPendingProcesses => _requestQueue.isNotEmpty;
 
   Future<T> enqueue<T>(
       {required Uint8List request,
       bool async = true,
-      required int correlationId}) {
+      required int correlationId,
+      required Socket sock}) {
     final completer = Completer<T>();
 
-    _requestQueue.add(_QueuedRequest<T>(request, correlationId));
+    _requestQueue.add(_QueuedRequest<T>(request, correlationId, sock));
 
     if (_requestQueue.length == 1) {
       _processQueue();
@@ -28,7 +30,7 @@ class RequestController {
     while (_requestQueue.isNotEmpty) {
       var queuedRequest = _requestQueue.removeFirst();
       try {
-        server.add(queuedRequest.request);
+        queuedRequest.sock.add(queuedRequest.request);
       } catch (e, stackTrace) {
         throw Exception(
             "Error while sending request ${queuedRequest.correlationId}! StackTrace: $stackTrace");
@@ -40,6 +42,7 @@ class RequestController {
 class _QueuedRequest<T> {
   final Uint8List request;
   final int correlationId;
+  final Socket sock;
 
-  _QueuedRequest(this.request, this.correlationId);
+  _QueuedRequest(this.request, this.correlationId, this.sock);
 }

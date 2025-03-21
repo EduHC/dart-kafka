@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dart_kafka/src/apis/kafka_metadata_api.dart';
 import 'package:dart_kafka/src/apis/kafka_version_api.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/kafka_client.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
@@ -20,9 +21,8 @@ class KafkaAdmin {
       {String? clientId,
       int? apiVersion,
       int? correlationId,
-      bool async = true}) async {
-    if (kafka.server == null) return;
-
+      bool async = true,
+      Socket? sock}) async {
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = versionApi.serialize(
@@ -30,9 +30,12 @@ class KafkaAdmin {
         clientId: clientId,
         apiVersion: apiVersion ?? 0);
 
-    print("${DateTime.now()} || [APP] ApiVersionRequest: $message");
+    // print("${DateTime.now()} || [APP] ApiVersionRequest: $message");
     kafka.enqueueRequest(
-        request: message, correlationId: finalCorrelationId, async: async);
+        request: message,
+        correlationId: finalCorrelationId,
+        async: async,
+        sock: sock ?? kafka.getAnyBroker());
 
     Future<dynamic> res = kafka.storeProcessingRequest(
       correlationId: finalCorrelationId,
@@ -55,8 +58,6 @@ class KafkaAdmin {
       required List<String> topics,
       String? clientId,
       bool async = true}) async {
-    if (kafka.server == null) return;
-
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = metadataApi.serialize(
@@ -68,16 +69,29 @@ class KafkaAdmin {
         includeClusterAuthorizedOperations: false,
         includeTopicAuthorizedOperations: false);
 
-    print("${DateTime.now()} || [APP] MetadataRequest: $message");
-    kafka.enqueueRequest(
-        request: message, correlationId: finalCorrelationId, async: async);
+    // print("${DateTime.now()} || [APP] MetadataRequest: $message");
+    // kafka.enqueueRequest(
+    //     request: message,
+    //     correlationId: finalCorrelationId,
+    //     async: async,
+    //     sock: kafka.getAnyBroker());
 
-    Future<dynamic> res = kafka.storeProcessingRequest(
+    // Future<dynamic> res = kafka.storeProcessingRequest(
+    //   correlationId: finalCorrelationId,
+    //   deserializer: metadataApi.deserialize,
+    //   apiVersion: apiVersion ?? 5,
+    //   async: async,
+    // );
+
+    Future<dynamic> res = kafka.tEnqueueRequest(
+        message: message,
         correlationId: finalCorrelationId,
-        deserializer: metadataApi.deserialize,
+        apiKey: METADATA,
         apiVersion: apiVersion ?? 5,
-        async: async,
-    );
+        function: metadataApi.deserialize,
+        topic: null,
+        partition: null,
+        async: async);
 
     if (async) return;
 

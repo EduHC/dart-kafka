@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:typed_data';
 
+import 'package:dart_kafka/src/interceptors/error_interceptor.dart';
 import 'package:dart_kafka/src/models/components/message_header.dart';
 import 'package:dart_kafka/src/definitions/types.dart';
 
@@ -52,12 +53,7 @@ class ResponseController {
   }
 
   Future<void> handleResponse(Uint8List response) async {
-    if (response.length < 14) {
-      print("Invalid byte array");
-      return;
-    }
-
-    print("Raw received: $response");
+    // print("Raw received: $response");
     final byteData = ByteData.sublistView(response);
     MessageHeader header = _extractMessageHeader(response);
 
@@ -71,11 +67,20 @@ class ResponseController {
       return;
     }
 
-    final int apiVersion =
-        _pendingRequests[header.correlationId]!['apiVersion'];
+    final int apiVersion = _pendingRequests[header.correlationId]!['apiVersion'];
     final deserializer = _pendingRequests[header.correlationId]!['function'];
     Uint8List message = byteData.buffer.asUint8List().sublist(header.offset);
     dynamic entity = deserializer(message, apiVersion);
+    final entityAnalisys = _messageInterceptor(entity: entity);
+
+    if (entityAnalisys.hasError && entityAnalisys.errorInfo?['retry']) {
+      // TODO: allocate the request to Retry
+      return;
+    }
+
+    if (entityAnalisys.hasError) {
+      throw Exception(entityAnalisys.errorInfo?['message']);
+    }
 
     completeRequest(correlationId: header.correlationId, entity: entity);
   }
@@ -135,5 +140,10 @@ class ResponseController {
         messageLength: messageLength,
         correlationId: correlationId,
         offset: offset);
+  }
+
+  ({bool hasError, Map<String, dynamic>? errorInfo}) _messageInterceptor(
+      {required dynamic entity}) {
+    return ErrorInterceptor.hasError(entity: entity);
   }
 }

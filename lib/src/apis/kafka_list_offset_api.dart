@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dart_kafka/dart_kafka.dart';
 import 'package:dart_kafka/src/models/responses/list_offset_response.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
+import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
@@ -11,6 +12,7 @@ class KafkaListOffsetApi {
   final int apiKey = LIST_OFFSETS;
   final Utils utils = Utils();
   final Encoder encoder = Encoder();
+  final Decoder decoder = Decoder();
 
   /// Method to serialize the ListOffsetsRequest
   Uint8List serialize({
@@ -82,15 +84,15 @@ class KafkaListOffsetApi {
     final int throttleTimeMs = buffer.getInt32(offset);
     offset += 4;
 
-    final topicsLength = utils.readCompactArrayLength(buffer, offset);
+    final topicsLength = decoder.readCompactArrayLength(buffer, offset);
     offset += topicsLength.bytesRead;
 
     List<Topic> topics = [];
     for (int i = 0; i < topicsLength.value; i++) {
-      final topicName = utils.readCompactString(buffer, offset);
+      final topicName = decoder.readCompactString(buffer, offset);
       offset += topicName.bytesRead;
 
-      final partitionsLength = utils.readCompactArrayLength(buffer, offset);
+      final partitionsLength = decoder.readCompactArrayLength(buffer, offset);
       offset += partitionsLength.bytesRead;
 
       List<Partition> partitions = [];

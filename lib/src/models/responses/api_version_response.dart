@@ -2,13 +2,13 @@ import 'dart:typed_data';
 
 import 'package:dart_kafka/src/models/components/api_version.dart';
 
-class KafkaApiVersionResponse {
+class ApiVersionResponse {
   final int version;
   final int errorCode;
   final List<ApiVersion> apiVersions;
   final int? throttleTimeMs;
 
-  KafkaApiVersionResponse({
+  ApiVersionResponse({
     required this.version,
     required this.errorCode,
     required this.apiVersions,

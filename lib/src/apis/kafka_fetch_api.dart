@@ -7,6 +7,7 @@ import 'package:dart_kafka/src/models/components/record_header.dart';
 import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/responses/fetch_response.dart';
 import 'package:dart_kafka/src/models/topic.dart';
+import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
@@ -15,6 +16,7 @@ class KafkaFetchApi {
   final int apiKey = FETCH;
   Utils utils = Utils();
   final Encoder encoder = Encoder();
+  final Decoder decoder = Decoder();
 
   /// Method to serialize to build and serialize the FetchRequest to Byte Array
   Uint8List serialize({
@@ -90,11 +92,6 @@ class KafkaFetchApi {
 
   /// Method to deserialize the FetchResponse from a Byte Array
   dynamic deserialize(Uint8List data, int apiVersion) {
-    if (data.length < 14) {
-      print("Invalid byte array: Insufficient length for FetchResponse");
-      return null;
-    }
-
     final buffer = ByteData.sublistView(data);
     int offset = 0;
 
@@ -241,28 +238,28 @@ class KafkaFetchApi {
     final List<Record> records = [];
 
     for (int i = 0; i < recordsLength; i++) {
-      var result = utils.readVarint(data.toList(), offset, signed: false);
+      var result = decoder.readVarint(data.toList(), offset, signed: false);
       final int recordLength = result.value;
       offset += result.bytesRead;
 
       final int attributes = buffer.getInt8(offset);
       offset += 1;
 
-      result = utils.readVarint(
+      result = decoder.readVarint(
         data.toList(),
         offset,
       );
       final int timestampDelta = result.value;
       offset += result.bytesRead;
 
-      result = utils.readVarint(
+      result = decoder.readVarint(
         data.toList(),
         offset,
       );
       final int offsetDelta = result.value;
       offset += result.bytesRead;
 
-      result = utils.readVarint(
+      result = decoder.readVarint(
         data.toList(),
         offset,
       );
@@ -274,7 +271,7 @@ class KafkaFetchApi {
           : String.fromCharCodes(buffer.buffer.asUint8List(offset, keyLength));
       offset += keyLength == -1 ? 0 : keyLength;
 
-      result = utils.readVarint(
+      result = decoder.readVarint(
         data.toList(),
         offset,
       );
@@ -291,7 +288,7 @@ class KafkaFetchApi {
           currentOffset: offset, amountOfBytes: 4, data: data.toList());
 
       if (hasHeaders) {
-        result = utils.readVarint(
+        result = decoder.readVarint(
           data.toList(),
           offset,
         );
@@ -302,7 +299,7 @@ class KafkaFetchApi {
 
       final List<RecordHeader> headers = [];
       for (int j = 0; j < headersLength; j++) {
-        result = utils.readVarint(
+        result = decoder.readVarint(
           data.toList(),
           offset,
         );
@@ -313,7 +310,7 @@ class KafkaFetchApi {
             buffer.buffer.asUint8List(offset, headerKeyLength));
         offset += headerKeyLength;
 
-        result = utils.readVarint(data.toList(), offset);
+        result = decoder.readVarint(data.toList(), offset);
         final int headerValueLength = result.value;
         offset += result.bytesRead;
 

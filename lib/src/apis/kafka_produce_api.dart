@@ -6,6 +6,7 @@ import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/responses/produce_response.dart';
 import 'package:dart_kafka/src/models/topic.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
+import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
@@ -14,6 +15,7 @@ class KafkaProduceApi {
   final int apiKey = PRODUCE; // ProduceRequest API key
   final Utils utils = Utils();
   final Encoder encoder = Encoder();
+  final Decoder decoder = Decoder();
 
   /// Serialize the ProduceRequest
   Uint8List serialize(
@@ -51,7 +53,8 @@ class KafkaProduceApi {
     for (final topic in topics) {
       if (apiVersion >= 9) {
         byteBuffer.add(encoder.compactString(topic.topicName));
-        byteBuffer.add(encoder.compactArrayLength(topic.partitions?.length ?? 0));
+        byteBuffer
+            .add(encoder.compactArrayLength(topic.partitions?.length ?? 0));
       } else {
         byteBuffer.add(encoder.string(topic.topicName));
         byteBuffer.add(encoder.int32(topic.partitions?.length ?? 0));
@@ -112,18 +115,18 @@ class KafkaProduceApi {
     int offset = 1; // ignore the tagged_buffer
 
     // Read responses array
-    final result = utils.readCompactArrayLength(buffer, offset);
+    final result = decoder.readCompactArrayLength(buffer, offset);
     final responsesLength = result.value;
     offset += result.bytesRead;
 
     final responses = <ProduceResponseComponent>[];
     for (int i = 0; i < responsesLength; i++) {
-      final topic = utils.readCompactString(buffer, offset);
+      final topic = decoder.readCompactString(buffer, offset);
       final String topicName = topic.value;
       offset += topic.bytesRead;
 
       // Read partition_responses array
-      final partitions = utils.readCompactArrayLength(buffer, offset);
+      final partitions = decoder.readCompactArrayLength(buffer, offset);
       final partitionResponsesLength = partitions.value;
       offset += partitions.bytesRead;
 
@@ -140,14 +143,14 @@ class KafkaProduceApi {
         final logStartOffset = buffer.getInt64(offset);
         offset += 8;
 
-        final errors = utils.readCompactArrayLength(buffer, offset);
+        final errors = decoder.readCompactArrayLength(buffer, offset);
         offset += errors.bytesRead;
 
         final errorResponses = <RecordError>[];
         for (int k = 0; k < errors.value; k++) {
           final int batchIndex = buffer.getInt32(offset);
           final batchErrorIndex =
-              utils.readCompactNullableString(buffer, offset);
+              decoder.readCompactNullableString(buffer, offset);
           offset += batchErrorIndex.bytesRead;
           final int taggedFields = buffer.getInt8(offset);
 
@@ -155,7 +158,7 @@ class KafkaProduceApi {
               batchIndex: batchIndex, errorMessage: batchErrorIndex.value));
         }
 
-        final errorMessage = utils.readCompactNullableString(buffer, offset);
+        final errorMessage = decoder.readCompactNullableString(buffer, offset);
         offset += errorMessage.bytesRead;
         final int taggedFields1 = buffer.getInt8(offset);
         offset += 1;
@@ -170,7 +173,8 @@ class KafkaProduceApi {
           Partition(
               id: partition,
               errorCode: errorCode,
-              errorMessage: errorMessage.value ?? (ERROR_MAP[errorCode] as Map)['message'],
+              errorMessage: errorMessage.value ??
+                  (ERROR_MAP[errorCode] as Map)['message'],
               baseOffset: baseOffset,
               logAppendTimeMs: logAppendTime,
               logStartOffset: logStartOffset,
@@ -192,7 +196,7 @@ class KafkaProduceApi {
     }
 
     // Read TAG_BUFFER (empty for now)
-    utils.readTagBuffer(buffer, offset);
+    decoder.readTagBuffer(buffer, offset);
 
     return ProduceResponse(
       responses: responses,

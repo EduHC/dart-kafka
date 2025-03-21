@@ -5,6 +5,7 @@ import 'package:dart_kafka/src/models/partition.dart';
 import 'package:dart_kafka/src/models/responses/describe_producer_response.dart';
 import 'package:dart_kafka/src/models/topic.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
+import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
@@ -13,6 +14,7 @@ class KafkaDescribeProducerApi {
   final int apiKey = DESCRIBE_PRODUCERS;
   final Utils utils = Utils();
   final Encoder encoder = Encoder();
+  final Decoder decoder = Decoder();
 
   /// Serialize the DescribeProducerRequest
   Uint8List serialize({
@@ -65,14 +67,14 @@ class KafkaDescribeProducerApi {
     offset += 4;
 
     List<Topic> topics = [];
-    final topicsLength = utils.readCompactArrayLength(buffer, offset);
+    final topicsLength = decoder.readCompactArrayLength(buffer, offset);
     offset += topicsLength.bytesRead;
 
     for (int i = 0; i < topicsLength.value; i++) {
-      final topicName = utils.readCompactString(buffer, offset);
+      final topicName = decoder.readCompactString(buffer, offset);
       offset += topicName.bytesRead;
 
-      final partitionsLength = utils.readCompactArrayLength(buffer, offset);
+      final partitionsLength = decoder.readCompactArrayLength(buffer, offset);
       offset += partitionsLength.bytesRead;
 
       List<Partition> partitions = [];
@@ -83,11 +85,11 @@ class KafkaDescribeProducerApi {
         final int errorCode = buffer.getInt16(offset);
         offset += 2;
 
-        final errorMessage = utils.readCompactNullableString(buffer, offset);
+        final errorMessage = decoder.readCompactNullableString(buffer, offset);
         offset += errorMessage.bytesRead;
 
         final activeProducerLength =
-            utils.readCompactArrayLength(buffer, offset);
+            decoder.readCompactArrayLength(buffer, offset);
         offset += activeProducerLength.bytesRead;
 
         List<ActiveProducer> activeProducers = [];

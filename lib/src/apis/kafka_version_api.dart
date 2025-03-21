@@ -90,7 +90,7 @@ class KafkaVersionApi {
       offset += 4;
     }
 
-    return KafkaApiVersionResponse(
+    return ApiVersionResponse(
       version: apiVersion,
       errorCode: errorCode,
       apiVersions: apiVersions,

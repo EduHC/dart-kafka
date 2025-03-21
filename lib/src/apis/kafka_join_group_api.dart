@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:dart_kafka/src/models/components/protocol.dart';
 import 'package:dart_kafka/src/models/responses/join_group_response.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
+import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
@@ -9,6 +10,7 @@ class KafkaJoinGroupApi {
   final int apiKey = JOIN_GROUP;
   final Utils utils = Utils();
   final Encoder encoder = Encoder();
+  final Decoder decoder = Decoder();
 
   /// Serialize the JoinGroupRequest to bytes
   Uint8List serialize(
@@ -74,30 +76,30 @@ class KafkaJoinGroupApi {
     final generationId = buffer.getInt32(offset);
     offset += 4;
 
-    final protocolType = utils.readCompactString(buffer, offset);
+    final protocolType = decoder.readCompactString(buffer, offset);
     offset += protocolType.bytesRead;
 
-    final protocolName = utils.readCompactString(buffer, offset);
+    final protocolName = decoder.readCompactString(buffer, offset);
     offset += protocolName.bytesRead;
 
-    final leader = utils.readCompactString(buffer, offset);
+    final leader = decoder.readCompactString(buffer, offset);
     offset += leader.bytesRead;
 
-    final memberId = utils.readCompactString(buffer, offset);
+    final memberId = decoder.readCompactString(buffer, offset);
     offset += memberId.bytesRead;
 
-    final membersLength = utils.readCompactArrayLength(buffer, offset);
+    final membersLength = decoder.readCompactArrayLength(buffer, offset);
     offset += membersLength.bytesRead;
 
     final members = <Map<String, dynamic>>[];
     for (int i = 0; i < membersLength.value; i++) {
-      final memberId = utils.readCompactString(buffer, offset);
+      final memberId = decoder.readCompactString(buffer, offset);
       offset += memberId.bytesRead;
 
-      final groupInstanceId = utils.readCompactNullableString(buffer, offset);
+      final groupInstanceId = decoder.readCompactNullableString(buffer, offset);
       offset += groupInstanceId.bytesRead;
 
-      final metadata = utils.readCompactBytes(buffer, offset);
+      final metadata = decoder.readCompactBytes(buffer, offset);
       offset += metadata.bytesRead;
 
       members.add({
@@ -107,7 +109,7 @@ class KafkaJoinGroupApi {
       });
     }
 
-    utils.readTagBuffer(buffer, offset);
+    decoder.readTagBuffer(buffer, offset);
 
     return JoinGroupResponse(
         throttleTimeMs: throttleTimeMs,
