@@ -7,10 +7,15 @@ import 'package:dart_kafka/dart_kafka.dart';
 class KafkaCluster {
   final Set<Broker> _brokers = {};
   // {'testeomnilightvitaverse.location': '192.168.200.31:29092'}
-  final HashMap<String, Map<int, String>> _topicsBrokers = HashMap();
+  final HashMap<String, Map<int, String>> _topicsBrokers = HashMap.from({
+    'testeomnilightvitaverse.status': {0: '192.168.200.131:29092'},
+    'testeomnilightvitaverse.sensor': {0: '192.168.200.131:29094'},
+  });
   // {'192.168.200.31:29092': Socket::class}
   final HashMap<String, Socket> _sockets = HashMap();
   final Set<StreamSubscription> _subscriptions = {};
+
+  List<String> get topicsInUse => _topicsBrokers.keys.toList();
 
   Future<void> connect({required Function responseHandler}) async {
     for (Broker broker in _brokers) {
@@ -93,6 +98,8 @@ class KafkaCluster {
   }
 
   void updateTopicsBroker({required MetadataResponse metadata}) {
+    print("Topicos antes de atualizar: ${_topicsBrokers.toString()}");
+    _topicsBrokers.clear();
     Map? brokers = {
       for (var b in metadata.brokers) b.nodeId: "${b.host}:${b.port}"
     };
@@ -107,6 +114,7 @@ class KafkaCluster {
       }
     }
 
+    print("Topicos dps de atualizaR: ${_topicsBrokers.toString()}");
     brokers.clear();
     brokers = null;
   }

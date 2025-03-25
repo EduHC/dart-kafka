@@ -22,10 +22,19 @@ class TrafficControler {
   final Queue<_RetryRequest> _retryRequestsQueue = Queue();
 
   final KafkaCluster cluster;
+  final KafkaAdmin admin;
+  final KafkaClient kafka;
 
-  TrafficControler({required this.cluster, required this.eventController});
+  late final ErrorInterceptor errorInterceptor;
 
-  bool isDraining = false;
+  TrafficControler(
+      {required this.cluster,
+      required this.eventController,
+      required this.admin,
+      required this.kafka}) {
+    errorInterceptor = ErrorInterceptor(kafka: kafka, admin: admin);
+  }
+
   bool get hasPendingProcesses =>
       _processingRequests.isNotEmpty ||
       _pendingResponses.isNotEmpty ||
@@ -34,16 +43,28 @@ class TrafficControler {
       _responseCompleters.isNotEmpty ||
       _retryRequestsQueue.isNotEmpty;
 
+  bool isDraining = false;
+  final List<int> _buffer = [];
+
   // Handle messages from Broker
   void enqueueBrokerMessage(Uint8List messages) {
-    final byteData = ByteData.sublistView(messages);
-    int offset = 0;
+    _buffer.addAll(messages);
 
-    while (offset < messages.length) {
-      int messageLength = byteData.getInt32(offset);
-      _messageQueue
-          .add(messages.sublist(offset, (offset + messageLength + 4).toInt()));
-      offset += messageLength + 4;
+    while (_buffer.length >= 4) {
+      final byteData = ByteData.sublistView(Uint8List.fromList(_buffer));
+      int messageLength = byteData.getInt32(0, Endian.big);
+
+      if (_buffer.length < messageLength + 4) {
+        // Wait for more data if the complete message is not available
+        return;
+      }
+
+      // Extract complete message
+      final completeMessage =
+          Uint8List.fromList(_buffer.sublist(0, messageLength + 4));
+      _buffer.removeRange(0, messageLength + 4);
+
+      _messageQueue.add(completeMessage);
     }
   }
 
@@ -62,9 +83,11 @@ class TrafficControler {
   }
 
   Future<void> handleBrokerMessageResponse(Uint8List response) async {
-    print("Raw received: $response");
+    // print("Raw received: $response");
     final byteData = ByteData.sublistView(response);
     MessageHeader header = _extractMessageHeader(response);
+
+    print("Requests pendentes: $_processingRequests");
 
     if (!_processingRequests.containsKey(header.correlationId)) {
       _pendingResponses.addAll({
@@ -81,7 +104,8 @@ class TrafficControler {
     final deserializer = _processingRequests[header.correlationId]!.function;
     Uint8List message = byteData.buffer.asUint8List().sublist(header.offset);
     dynamic entity = deserializer(message, apiVersion);
-    final entityAnalisys = _messageInterceptor(entity: entity);
+    // print("Decoded Entity: $entity");
+    final entityAnalisys = await _messageInterceptor(entity: entity);
 
     if (entityAnalisys.hasError && !entityAnalisys.errorInfo?['retry']) {
       throw Exception(entityAnalisys.errorInfo?['message']);
@@ -91,6 +115,7 @@ class TrafficControler {
       _enqueueRetryRequest(_RetryRequest(
           correlationId: header.correlationId,
           req: _processingRequests[header.correlationId]!));
+      return;
     }
 
     completeRequest(
@@ -141,7 +166,12 @@ class TrafficControler {
       Future.microtask(() => _drainPendingRequestQueue());
     }
 
-    if (async) return;
+    if (async) {
+      _responseCompleters.removeWhere(
+        (key, value) => key == correlationId,
+      );
+      return;
+    }
 
     return completer.future;
   }
@@ -179,15 +209,16 @@ class TrafficControler {
       {required int correlationId,
       required dynamic entity,
       bool hasToRetry = false}) {
+    // print("Entrou p/ completar a request");
     if (!_processingRequests.containsKey(correlationId)) return;
+    if (hasToRetry) return;
 
     _processingRequests.removeWhere(
       (key, value) => key == correlationId,
     );
 
-    if (hasToRetry) return;
-
     if (_responseCompleters.containsKey(correlationId)) {
+      // print("Encontrou um Completer p/ a request");
       _responseCompleters[correlationId]!.complete(entity);
       _responseCompleters.remove(correlationId);
     } else {
@@ -211,22 +242,28 @@ class TrafficControler {
         offset: offset);
   }
 
-  ({bool hasError, Map<String, dynamic>? errorInfo}) _messageInterceptor(
-      {required dynamic entity}) {
-    return ErrorInterceptor.hasError(entity: entity);
+  Future<({bool hasError, Map<String, dynamic>? errorInfo})>
+      _messageInterceptor({required dynamic entity}) async {
+    return await errorInterceptor.hasError(entity: entity);
   }
 
   void _enqueueRetryRequest(_RetryRequest req) {
     _retryRequestsQueue.add(req);
+    print(
+        "Setando requisição p/ Retry: ${req.correlationId} | ApiKey: ${req.req.apiKey} - version: ${req.req.apiVersion}");
 
     if (_retryRequestsQueue.length == 1) {
-      _drainRetryRequests();
+      Future.microtask(() => _drainRetryRequests());
     }
   }
 
   Future<dynamic> _drainRetryRequests() async {
+    print("Entrou p/ drenar a fila de Retry");
+    // Future.microtask(() => sleep(Duration(milliseconds: 200)));
     while (_retryRequestsQueue.isNotEmpty) {
       var retryRequest = _retryRequestsQueue.removeFirst();
+      _enqueueProcessingRequest(
+          correlationId: retryRequest.correlationId, req: retryRequest.req);
       sendRequestToBroker(req: retryRequest.req);
     }
   }

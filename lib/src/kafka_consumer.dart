@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dart_kafka/dart_kafka.dart';
@@ -19,7 +18,7 @@ class KafkaConsumer {
 
   Future<dynamic> sendFetchRequest(
       {int? correlationId,
-      int? apiVersion,
+      int apiVersion = 17,
       required String clientId,
       int? replicaId,
       int? maxWaitMs,
@@ -36,7 +35,7 @@ class KafkaConsumer {
 
         Uint8List message = fetchApi.serialize(
             correlationId: finalCorrelationId,
-            apiVersion: apiVersion ?? 17,
+            apiVersion: apiVersion,
             clientId: clientId,
             replicaId: replicaId,
             maxWaitMs: maxWaitMs,
@@ -45,23 +44,10 @@ class KafkaConsumer {
             isolationLevel: isolationLevel ?? 1,
             topics: topics);
 
-        print("${DateTime.now()} || [APP] FetchRequest: $message");
-        // kafka.enqueueRequest(
-        //   request: message,
-        //   correlationId: finalCorrelationId,
-        //   async: async,
-        // );
-
-        // Future<dynamic> res = kafka.storeProcessingRequest(
-        //   correlationId: finalCorrelationId,
-        //   deserializer: fetchApi.deserialize,
-        //   apiVersion: apiVersion ?? 17,
-        //   async: async,
-        // );
-
-        Future<dynamic> res = kafka.tEnqueueRequest(
+        // print("${DateTime.now()} || [APP] FetchRequest: $message");
+        Future<dynamic> res = kafka.enqueueRequest(
             apiKey: FETCH,
-            apiVersion: apiVersion ?? 17,
+            apiVersion: apiVersion,
             correlationId: finalCorrelationId,
             function: fetchApi.deserialize,
             topic: topic.topicName,
@@ -83,7 +69,7 @@ class KafkaConsumer {
 
   Future<dynamic> sendJoinGroupRequest({
     int? correlationId,
-    int? apiVersion,
+    int apiVersion = 9,
     required String groupId,
     required int sessionTimeoutMs,
     required int rebalanceTimeoutMs,
@@ -98,7 +84,7 @@ class KafkaConsumer {
 
     Uint8List message = joinGroupApi.serialize(
       correlationId: finalCorrelationId,
-      apiVersion: apiVersion ?? 9,
+      apiVersion: apiVersion,
       groupId: groupId,
       memberId: memberId,
       protocolType: protocolType,
@@ -108,19 +94,17 @@ class KafkaConsumer {
       protocols: protocols,
       reason: reason,
     );
-    // print("${DateTime.now()} || [APP] JoinGroupRequest: $message");
-    kafka.enqueueRequest(
-        request: message,
-        correlationId: finalCorrelationId,
-        async: async,
-        sock: kafka.getAnyBroker());
 
-    Future<dynamic> res = kafka.storeProcessingRequest(
-      correlationId: finalCorrelationId,
-      deserializer: joinGroupApi.deserialize,
-      apiVersion: apiVersion ?? 9,
-      async: async,
-    );
+    // print("${DateTime.now()} || [APP] JoinGroupRequest: $message");
+    Future<dynamic> res = kafka.enqueueRequest(
+        message: message,
+        correlationId: finalCorrelationId,
+        apiKey: JOIN_GROUP,
+        apiVersion: apiVersion,
+        function: joinGroupApi.deserialize,
+        topic: null,
+        partition: null,
+        async: async);
 
     if (async) return;
 
@@ -156,19 +140,15 @@ class KafkaConsumer {
         );
 
         // print("${DateTime.now()} || [APP] ListOffsetRequest: $message");
-        kafka.enqueueRequest(
-            request: message,
+        Future<dynamic> res = kafka.enqueueRequest(
+            message: message,
             correlationId: finalCorrelationId,
-            async: async,
-            sock: kafka.getBrokerForPartition(
-                topic: topic.topicName, partition: partition.id));
-
-        Future<dynamic> res = kafka.storeProcessingRequest(
-          correlationId: finalCorrelationId,
-          deserializer: listOffsetApi.deserialize,
-          apiVersion: apiVersion,
-          async: async,
-        );
+            apiKey: LIST_OFFSETS,
+            apiVersion: apiVersion,
+            function: listOffsetApi.deserialize,
+            topic: topic.topicName,
+            partition: partition.id,
+            async: async);
 
         responses.add(res);
       }

@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dart_kafka/dart_kafka.dart';
 import 'package:dart_kafka/src/apis/kafka_metadata_api.dart';
 import 'package:dart_kafka/src/apis/kafka_version_api.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/kafka_client.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaAdmin {
@@ -31,18 +31,15 @@ class KafkaAdmin {
         apiVersion: apiVersion ?? 0);
 
     // print("${DateTime.now()} || [APP] ApiVersionRequest: $message");
-    kafka.enqueueRequest(
-        request: message,
+    Future<dynamic> res = kafka.enqueueRequest(
+        message: message,
         correlationId: finalCorrelationId,
-        async: async,
-        sock: sock ?? kafka.getAnyBroker());
-
-    Future<dynamic> res = kafka.storeProcessingRequest(
-      correlationId: finalCorrelationId,
-      deserializer: versionApi.deserialize,
-      apiVersion: apiVersion ?? 0,
-      async: async,
-    );
+        apiKey: API_VERSIONS,
+        apiVersion: apiVersion ?? 5,
+        function: versionApi.deserialize,
+        topic: null,
+        partition: null,
+        async: async);
 
     if (async) return;
 
@@ -69,21 +66,7 @@ class KafkaAdmin {
         includeClusterAuthorizedOperations: false,
         includeTopicAuthorizedOperations: false);
 
-    // print("${DateTime.now()} || [APP] MetadataRequest: $message");
-    // kafka.enqueueRequest(
-    //     request: message,
-    //     correlationId: finalCorrelationId,
-    //     async: async,
-    //     sock: kafka.getAnyBroker());
-
-    // Future<dynamic> res = kafka.storeProcessingRequest(
-    //   correlationId: finalCorrelationId,
-    //   deserializer: metadataApi.deserialize,
-    //   apiVersion: apiVersion ?? 5,
-    //   async: async,
-    // );
-
-    Future<dynamic> res = kafka.tEnqueueRequest(
+    Future<dynamic> res = kafka.enqueueRequest(
         message: message,
         correlationId: finalCorrelationId,
         apiKey: METADATA,
@@ -96,5 +79,27 @@ class KafkaAdmin {
     if (async) return;
 
     return res;
+  }
+
+  Future<void> updateTopicsMetadata(
+      {int? correlationId,
+      int apiVersion = 9,
+      bool? allowAutoTopicCreation,
+      bool? includeClusterAuthorizedOperations,
+      bool? includeTopicAuthorizedOperations,
+      required List<String> topics,
+      String? clientId,
+      bool async = true}) async {
+    MetadataResponse metadata = await sendMetadataRequest(
+        topics: topics,
+        async: false,
+        apiVersion: apiVersion,
+        clientId: 'dart-kafka',
+        allowAutoTopicCreation: allowAutoTopicCreation,
+        includeClusterAuthorizedOperations: includeClusterAuthorizedOperations,
+        includeTopicAuthorizedOperations: includeTopicAuthorizedOperations,
+        correlationId: correlationId);
+
+    kafka.updateTopicsBroker(metadata: metadata);
   }
 }

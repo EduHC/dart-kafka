@@ -4,6 +4,7 @@ import 'package:dart_kafka/dart_kafka.dart';
 import 'package:dart_kafka/src/apis/kafka_describe_producer_api.dart';
 import 'package:dart_kafka/src/apis/kafka_initi_producer_id_api.dart';
 import 'package:dart_kafka/src/apis/kafka_produce_api.dart';
+import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
 
 class KafkaProducer {
@@ -56,19 +57,16 @@ class KafkaProducer {
         );
 
         // print("${DateTime.now()} || [APP] ProduceRequest: $message");
-        kafka.enqueueRequest(
-            request: message,
+        Future<dynamic> res = kafka.enqueueRequest(
+            message: message,
             correlationId: finalCorrelationId,
-            async: async,
-            sock: kafka.getBrokerForPartition(
-                topic: topic.topicName, partition: partition.id));
+            apiKey: PRODUCE,
+            apiVersion: apiVersion,
+            function: produceApi.deserialize,
+            topic: topic.topicName,
+            partition: partition.id,
+            async: async);
 
-        Future<dynamic> res = kafka.storeProcessingRequest(
-          correlationId: finalCorrelationId,
-          deserializer: produceApi.deserialize,
-          apiVersion: apiVersion,
-          async: async,
-        );
         responses.add(res);
       }
     }
@@ -86,7 +84,7 @@ class KafkaProducer {
     required int producerId,
     required int producerEpoch,
     int? correlationId,
-    int? apiVersion,
+    int apiVersion = 4,
     String? clientId,
     bool async = true,
   }) async {
@@ -95,23 +93,20 @@ class KafkaProducer {
         transactionTimeoutMs: transactionTimeoutMs,
         producerId: producerId,
         producerEpoch: producerEpoch,
-        apiVersion: apiVersion ?? 4,
+        apiVersion: apiVersion,
         clientId: clientId,
         correlationId: finalCorrelationId);
 
     // print("${DateTime.now()} || [APP] InitProduceId: $message");
-    kafka.enqueueRequest(
-        request: message,
+    Future<dynamic> res = kafka.enqueueRequest(
+        message: message,
         correlationId: finalCorrelationId,
-        async: async,
-        sock: kafka.getAnyBroker());
-
-    Future<dynamic> res = kafka.storeProcessingRequest(
-      correlationId: finalCorrelationId,
-      deserializer: initProducerIdApi.deserialize,
-      apiVersion: apiVersion ?? 4,
-      async: async,
-    );
+        apiKey: INIT_PRODUCER_ID,
+        apiVersion: apiVersion,
+        function: initProducerIdApi.deserialize,
+        topic: null,
+        partition: null,
+        async: async);
 
     if (async) return;
 
@@ -135,18 +130,15 @@ class KafkaProducer {
         clientId: clientId);
 
     // print("${DateTime.now()} || [APP] DescribeProducerRequest: $message");
-    kafka.enqueueRequest(
-        request: message,
+    Future<dynamic> res = kafka.enqueueRequest(
+        message: message,
         correlationId: finalCorrelationId,
-        async: async,
-        sock: kafka.getAnyBroker());
-
-    Future<dynamic> res = kafka.storeProcessingRequest(
-      correlationId: finalCorrelationId,
-      deserializer: describeProducerApi.deserialize,
-      apiVersion: apiVersion,
-      async: async,
-    );
+        apiKey: DESCRIBE_PRODUCERS,
+        apiVersion: apiVersion,
+        function: describeProducerApi.deserialize,
+        topic: null,
+        partition: null,
+        async: async);
 
     if (async) return;
 
