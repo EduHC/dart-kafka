@@ -10,7 +10,7 @@
 [] Create a singleton to initiate the Utils, Encoder and Decoder classes and reuse 'em in everywhere possible
 [] Create an error handler for every message return.
 [] Split the "Partition" model to each usage it has with different fields
-[] Refactor the Request and Response controllers to be one single class that handles the traffic
 
 [x] Refactor the API classes to use the Encoder and Decoder classes
 [x] Remove from the Utils class every method related to Encode or Decode
+[x] Refactor the Request and Response controllers to be one single class that handles the traffic

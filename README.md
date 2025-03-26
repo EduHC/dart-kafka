@@ -5,13 +5,13 @@
 
 A pure Dart implementation of the Apache Kafka Protocol from scratch. This project provides a lightweight, efficient, and easy-to-use Kafka client for Dart applications. It includes support for producing, consuming, and administering Kafka topics, all implemented natively in Dart.
 
-## Features
+## Main Classes
 
 - **KafkaProducer:** Produce messages to Kafka topics.
 - **KafkaConsumer:** Consume messages from Kafka topics.
 - **KafkaAdmin:** Administer Kafka topics, partitions, and configurations.
-- **KafkaClient:** Core client for interacting with Kafka brokers.
-- **MIT Licensed:** Free to use, modify, and distribute.
+- **KafkaClient:** Core client for handling generic controls such as queues, conncect and close.
+- **KafkaCluster:** Responsible for handling interaction with Kafka Brokers.
 
 ## Installation
 
@@ -27,25 +27,6 @@ Then, run `dart pub get` to install the package.
 
 ## Usage
 
-### 1. KafkaClient
-The core TPC connection and response handler:
-
-```dart
-import 'package:dart_kafka/dart_kafka.dart';
-
-void main() async {
-  KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
-  await kafka.connect();
-
-  kafka.addPendingRequest(
-        correlationId: correlationId,
-        deserializer: metadataApi.deserialize);
-
-  kafka.completeRequest(correlationId);
-  await client.close();
-}
-```
-
 ### 2. KafkaProducer
 Produce messages to a Kafka topic:
 
@@ -53,47 +34,156 @@ Produce messages to a Kafka topic:
 import 'package:dart_kafka/dart_kafka.dart';
 
 void main() async {
-    final KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
-    await kafka.connect();
-    
-    final producer = KafkaProducer(kafka: kafka);
+  List<Broker> brokers = [
+    Broker(host: '192.168.200.131', port: 29092),
+    Broker(host: '192.168.200.131', port: 29093),
+    Broker(host: '192.168.200.131', port: 29094),
+  ];
+  final KafkaClient kafka = KafkaClient(brokers: brokers);
+  await kafka.connect();
 
-    await producer.send(
-        topic: 'test-topic',
-        key: 'message-key',
-        value: 'Hello, Kafka!',
-    );
+  Future.microtask(
+    () => kafka.eventStream.listen(
+      (event) => print("Received from Stream: $event"),
+    ),
+  );
 
-    await kafka.close();
+  KafkaAdmin admin = KafkaAdmin(kafka: kafka);
+  await admin.updateTopicsMetadata(
+      topics: [
+        'test-topic',
+        'notifications',
+      ],
+      async: false,
+      apiVersion: 9,
+      clientId: 'dart-kafka',
+      allowAutoTopicCreation: false,
+      includeClusterAuthorizedOperations: false,
+      includeTopicAuthorizedOperations: false,
+      correlationId: null);
+
+  KafkaProducer producer = KafkaProducer(kafka: kafka);
+
+  producer.produce(
+      acks: -1,
+      timeoutMs: 1500,
+      topics: [
+        Topic(topicName: 'notifications', partitions: [
+          Partition(
+              id: 0,
+              batch: RecordBatch(records: [
+                Record(
+                    attributes: 0,
+                    timestampDelta: 0,
+                    offsetDelta: 0,
+                    timestamp: DateTime.now().millisecondsSinceEpoch,
+                    value: '{"id": 1}')
+              ]))
+        ]),
+      ],
+      async: true,
+      apiVersion: 11,
+      clientId: 'dart-kafka',
+      producerId: -1,
+      attributes: 0);
+
+  dynamic res = await producer.produce(
+      acks: -1,
+      timeoutMs: 1500,
+      topics: [
+        Topic(topicName: 'test-topic', partitions: [
+          Partition(
+              id: 0,
+              batch: RecordBatch(records: [
+                Record(
+                    attributes: 0,
+                    timestampDelta: 0,
+                    offsetDelta: 0,
+                    timestamp: DateTime.now().millisecondsSinceEpoch,
+                    value: '{"test": "This is a test!"}')
+              ]))
+        ]),
+      ],
+      async: false,
+      apiVersion: 11,
+      clientId: 'dart-kafka',
+      producerId: -1,
+      attributes: 0);
+
+  print("Sync deu: $res");
+
+  kafka.close();
+  return;
 }
+
 ```
 
-### 3. KafkaConsumer
+### 2. KafkaConsumer
 Consume messages from a Kafka topic:
 
 ```dart
 import 'package:dart_kafka/dart_kafka.dart';
 
 void main() async {
-    final KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
-    await kafka.connect();
-    
-    final consumer = KafkaConsumer(kafka: kafka);
+  List<Broker> brokers = [
+    Broker(host: '192.168.200.131', port: 29092),
+    Broker(host: '192.168.200.131', port: 29093),
+    Broker(host: '192.168.200.131', port: 29094),
+  ];
+  final KafkaClient kafka = KafkaClient(brokers: brokers);
+  await kafka.connect();
 
-    List<Topic> topics = [
-    Topic(
-        topicName: 'test-topic',
-        partitions: [Partition(partitionId: 0, logStartOffset: 0)])
-    ];
-    await consumer.sendFetchRequest(
-        clientId: 'consumer',
-        topics: topics, 
-        isolationLevel: 0, 
-        apiVersion: 8
-    );
+  // Listen to the Streaming events received from Async requests
+  Future.microtask(
+    () => kafka.eventStream.listen(
+      (event) => print("[ASYNC request]: $event"),
+    ),
+  );
 
-    await kafka.close();
+  KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
+
+  consumer.sendFetchRequest(
+      clientId: 'dart-kafka',
+      apiVersion: 8,
+      async: true,
+      topics: [
+        Topic(topicName: 'test-topic', partitions: [
+          Partition(id: 0, fetchOffset: 0),
+        ])
+      ]);
+
+  KafkaAdmin admin = kafka.admin;
+  await admin.updateTopicsMetadata(
+      topics: [
+        'test-topic',
+        'notifications',
+      ],
+      async: false,
+      apiVersion: 9,
+      clientId: 'dart-kafka',
+      allowAutoTopicCreation: false,
+      includeClusterAuthorizedOperations: false,
+      includeTopicAuthorizedOperations: false,
+      correlationId: null);
+
+  dynamic res = await consumer.sendFetchRequest(
+      clientId: 'dart-kafka',
+      apiVersion: 8,
+      async: false,
+      topics: [
+        Topic(topicName: 'notifications', partitions: [
+          Partition(id: 0, fetchOffset: 0),
+        ])
+      ]);
+
+  print("*********************************************");
+  print("[SYNC Request]: $res");
+
+  kafka.close();
+  return;
 }
+
+
 ```
 
 ### 4. KafkaAdmin

@@ -16,15 +16,10 @@ void main() async {
   );
 
   KafkaAdmin admin = KafkaAdmin(kafka: kafka);
-
-  MetadataResponse metadata = await admin.sendMetadataRequest(
+  await admin.updateTopicsMetadata(
       topics: [
-        'testeomnilightvitaverse.location',
-        'testeomnilightvitaverse.sensor',
-        'testeomnilightvitaverse.status',
-        'testeomnilightvitaverse.machine_config',
-        'testeomnilightvitaverse.machine_logs',
-        'testeomnilightvitaverse.api_logs',
+        'test-topic',
+        'notifications',
       ],
       async: false,
       apiVersion: 9,
@@ -34,16 +29,13 @@ void main() async {
       includeTopicAuthorizedOperations: false,
       correlationId: null);
 
-  kafka.updateTopicsBroker(metadata: metadata);
-  admin.sendApiVersionRequest(sock: kafka.getAnyBroker(), apiVersion: 2);
-
   KafkaProducer producer = KafkaProducer(kafka: kafka);
 
   producer.produce(
       acks: -1,
       timeoutMs: 1500,
       topics: [
-        Topic(topicName: 'testeomnilightvitaverse.status', partitions: [
+        Topic(topicName: 'notifications', partitions: [
           Partition(
               id: 0,
               batch: RecordBatch(records: [
@@ -52,7 +44,7 @@ void main() async {
                     timestampDelta: 0,
                     offsetDelta: 0,
                     timestamp: DateTime.now().millisecondsSinceEpoch,
-                    value: '{"teste": "tesssssskkepokasdoiasjdaisohte"}')
+                    value: '{"id": 1}')
               ]))
         ]),
       ],
@@ -66,7 +58,7 @@ void main() async {
       acks: -1,
       timeoutMs: 1500,
       topics: [
-        Topic(topicName: 'testeomnilightvitaverse.sensor', partitions: [
+        Topic(topicName: 'test-topic', partitions: [
           Partition(
               id: 0,
               batch: RecordBatch(records: [
@@ -75,8 +67,7 @@ void main() async {
                     timestampDelta: 0,
                     offsetDelta: 0,
                     timestamp: DateTime.now().millisecondsSinceEpoch,
-                    value:
-                        '{"FukingSensor": "ssssssssssssensorrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"}')
+                    value: '{"test": "This is a test!"}')
               ]))
         ]),
       ],
@@ -88,8 +79,6 @@ void main() async {
 
   print("Sync deu: $res");
 
-
-  
   kafka.close();
   return;
 }

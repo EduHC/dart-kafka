@@ -23,10 +23,10 @@ class KafkaFetchApi {
     required int correlationId,
     required int apiVersion,
     required String? clientId,
-    int? replicaId,
-    int? maxWaitMs,
-    int? minBytes,
-    int? maxBytes,
+    required int replicaId,
+    required int maxWaitMs,
+    required int minBytes,
+    required int maxBytes,
     required int isolationLevel,
     required List<Topic> topics,
   }) {
@@ -44,10 +44,10 @@ class KafkaFetchApi {
       byteBuffer.add(encoder.int16(-1));
     }
 
-    byteBuffer.add(encoder.int32(replicaId ?? -1));
-    byteBuffer.add(encoder.int32(maxWaitMs ?? 30000));
-    byteBuffer.add(encoder.int32(minBytes ?? 1));
-    byteBuffer.add(encoder.int32(maxBytes ?? 10000));
+    byteBuffer.add(encoder.int32(replicaId));
+    byteBuffer.add(encoder.int32(maxWaitMs));
+    byteBuffer.add(encoder.int32(minBytes));
+    byteBuffer.add(encoder.int32(maxBytes));
 
     // Add isolation level (0 = read_uncommitted, 1 = read_committed)
     byteBuffer.add(encoder.int8(isolationLevel));

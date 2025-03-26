@@ -23,53 +23,38 @@ void main() async {
       apiVersion: 8,
       async: true,
       topics: [
-        Topic(topicName: 'testeomnilightvitaverse.status', partitions: [
+        Topic(topicName: 'test-topic', partitions: [
           Partition(id: 0, fetchOffset: 0),
         ])
       ]);
+
+  KafkaAdmin admin = kafka.admin;
+  await admin.updateTopicsMetadata(
+      topics: [
+        'test-topic',
+        'notifications',
+      ],
+      async: false,
+      apiVersion: 9,
+      clientId: 'dart-kafka',
+      allowAutoTopicCreation: false,
+      includeClusterAuthorizedOperations: false,
+      includeTopicAuthorizedOperations: false,
+      correlationId: null);
 
   dynamic res = await consumer.sendFetchRequest(
       clientId: 'dart-kafka',
       apiVersion: 8,
       async: false,
       topics: [
-        Topic(topicName: 'testeomnilightvitaverse.status', partitions: [
+        Topic(topicName: 'notifications', partitions: [
           Partition(id: 0, fetchOffset: 0),
         ])
       ]);
+
   print("*********************************************");
   print("[SYNC Request]: $res");
 
-  // KafkaAdmin admin = kafka.admin;
-  // await admin.updateTopicsMetadata(
-  //     topics: [
-  //       'testeomnilightvitaverse.sensor',
-  //       'testeomnilightvitaverse.status',
-  //       'testeomnilightvitaverse.machine_config',
-  //       'testeomnilightvitaverse.machine_logs',
-  //       'testeomnilightvitaverse.api_logs',
-  //     ],
-  //     async: false,
-  //     apiVersion: 9,
-  //     clientId: 'dart-kafka',
-  //     allowAutoTopicCreation: false,
-  //     includeClusterAuthorizedOperations: false,
-  //     includeTopicAuthorizedOperations: false,
-  //     correlationId: null);
-
-  // dynamic
-  // res = await consumer.sendFetchRequest(
-  //     clientId: 'dart-kafka',
-  //     apiVersion: 8,
-  //     async: false,
-  //     topics: [
-  //       Topic(topicName: 'testeomnilightvitaverse.sensor', partitions: [
-  //         Partition(id: 0, fetchOffset: 00),
-  //       ])
-  //     ]);
-
-  // print("*********************************************");
-  // print(res);
   kafka.close();
   return;
 }

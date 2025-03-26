@@ -20,11 +20,11 @@ class KafkaConsumer {
       {int? correlationId,
       int apiVersion = 17,
       required String clientId,
-      int? replicaId,
-      int? maxWaitMs,
-      int? minBytes,
-      int? maxBytes,
-      int? isolationLevel,
+      int replicaId = -1,
+      int maxWaitMs = 30000,
+      int minBytes = 1,
+      int maxBytes = 10000,
+      int isolationLevel = 1,
       required List<Topic> topics,
       bool async = true}) async {
     final List<Future<dynamic>> responses = [];
@@ -41,7 +41,7 @@ class KafkaConsumer {
             maxWaitMs: maxWaitMs,
             minBytes: minBytes,
             maxBytes: maxBytes,
-            isolationLevel: isolationLevel ?? 1,
+            isolationLevel: isolationLevel,
             topics: topics);
 
         // print("${DateTime.now()} || [APP] FetchRequest: $message");
