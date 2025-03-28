@@ -19,7 +19,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  kafka_dart:
+  dart-kafka:
     git: https://github.com/EduHC/dart-kafka.git
 ```
 
@@ -42,9 +42,10 @@ void main() async {
   final KafkaClient kafka = KafkaClient(brokers: brokers);
   await kafka.connect();
 
+  // Listen to the Streaming events received from Async requests
   Future.microtask(
     () => kafka.eventStream.listen(
-      (event) => print("Received from Stream: $event"),
+      (event) => print("[ASYNC response]: $event"),
     ),
   );
 
@@ -110,7 +111,8 @@ void main() async {
       producerId: -1,
       attributes: 0);
 
-  print("Sync deu: $res");
+  print("*********************************************");
+  print("[SYNC Response]: $res");
 
   kafka.close();
   return;
@@ -136,7 +138,7 @@ void main() async {
   // Listen to the Streaming events received from Async requests
   Future.microtask(
     () => kafka.eventStream.listen(
-      (event) => print("[ASYNC request]: $event"),
+      (event) => print("[ASYNC response]: $event"),
     ),
   );
 
@@ -177,7 +179,7 @@ void main() async {
       ]);
 
   print("*********************************************");
-  print("[SYNC Request]: $res");
+  print("[SYNC Response]: $res");
 
   kafka.close();
   return;
@@ -196,6 +198,13 @@ void main() async {
     final KafkaClient kafka = KafkaClient(host: '192.168.3.55', port: 29092);
     await kafka.connect();
     
+      // Listen to the Streaming events received from Async requests
+    Future.microtask(
+     () => kafka.eventStream.listen(
+          (event) => print("[ASYNC response]: $event"),
+        ),
+     );
+
     final admin = KafkaAdmin(kafka: kafka);
 
     await admin.sendApiVersionRequest(apiVersion: 0, clientId: 'test');

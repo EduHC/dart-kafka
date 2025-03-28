@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:dart_kafka/dart_kafka.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
+import 'package:dart_kafka/src/definitions/message_headers_version.dart';
 import 'package:dart_kafka/src/definitions/types.dart';
 import 'package:dart_kafka/src/interceptors/error_interceptor.dart';
 import 'package:dart_kafka/src/kafka_cluster.dart';
@@ -85,23 +86,35 @@ class TrafficControler {
   Future<void> handleBrokerMessageResponse(Uint8List response) async {
     // print("Raw received: $response");
     final byteData = ByteData.sublistView(response);
-    MessageHeader header = _extractMessageHeader(response);
+
+    int offset = 0;
+    final int messageLength = byteData.getInt32(offset, Endian.big);
+    offset += 4;
+
+    final int correlationId = byteData.getInt32(offset, Endian.big);
+    offset += 4;
+
+    _Request? req = _processingRequests[correlationId];
+
+    if (req == null) return;
+
+    MessageHeader header = _extractMessageHeader(
+        response: response, apiKey: req.apiKey, apiVersion: req.apiVersion);
 
     print("Requests pendentes: $_processingRequests");
 
-    if (!_processingRequests.containsKey(header.correlationId)) {
-      _pendingResponses.addAll({
-        header.correlationId: {
-          'apiVersion': header.apiVersion,
-          'message': byteData.buffer.asUint8List().sublist(header.offset)
-        }
-      });
-      return;
-    }
+    // if (!_processingRequests.containsKey(header.correlationId)) {
+    //   _pendingResponses.addAll({
+    //     header.correlationId: {
+    //       'apiVersion': header.apiVersion,
+    //       'message': byteData.buffer.asUint8List().sublist(header.offset)
+    //     }
+    //   });
+    //   return;
+    // }
 
-    final int apiVersion =
-        _processingRequests[header.correlationId]!.apiVersion;
-    final deserializer = _processingRequests[header.correlationId]!.function;
+    final int apiVersion = _processingRequests[correlationId]!.apiVersion;
+    final deserializer = _processingRequests[correlationId]!.function;
     Uint8List message = byteData.buffer.asUint8List().sublist(header.offset);
     dynamic entity = deserializer(message, apiVersion);
     // print("Decoded Entity: $entity");
@@ -113,13 +126,13 @@ class TrafficControler {
 
     if (entityAnalisys.hasError) {
       _enqueueRetryRequest(_RetryRequest(
-          correlationId: header.correlationId,
-          req: _processingRequests[header.correlationId]!));
+          correlationId: correlationId,
+          req: _processingRequests[correlationId]!));
       return;
     }
 
     completeRequest(
-        correlationId: header.correlationId,
+        correlationId: correlationId,
         entity: entity,
         hasToRetry: entityAnalisys.hasError);
   }
@@ -226,20 +239,22 @@ class TrafficControler {
     }
   }
 
-  MessageHeader _extractMessageHeader(Uint8List response) {
+  MessageHeader _extractMessageHeader(
+      {required Uint8List response,
+      required int apiKey,
+      required int apiVersion}) {
     final byteData = ByteData.sublistView(response);
-    int offset = 0;
+    int offset = 8;
 
-    final int messageLength = byteData.getInt32(offset, Endian.big);
-    offset += 4;
+    int headerVersion = MessageHeaderVersion.responseHeaderVersion(
+        apiKey: apiKey, apiVersion: apiVersion);
 
-    final int correlationId = byteData.getInt32(offset, Endian.big);
-    offset += 4;
+    if (headerVersion > 1) {
+      final int taggedField = byteData.getInt8(offset);
+      offset += 1;
+    }
 
-    return MessageHeader(
-        messageLength: messageLength,
-        correlationId: correlationId,
-        offset: offset);
+    return MessageHeader(offset: offset);
   }
 
   Future<({bool hasError, Map<String, dynamic>? errorInfo})>

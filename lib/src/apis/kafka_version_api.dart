@@ -27,6 +27,7 @@ class KafkaVersionApi {
     if (apiVersion > 2) {
       buffer.add(encoder.compactString(clientSoftwareName));
       buffer.add(encoder.compactString(clientSoftwareVersion));
+      buffer.add(encoder.uint8(0)); // _tagged_field
     }
 
     return Uint8List.fromList([
