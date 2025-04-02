@@ -2,6 +2,7 @@ import 'package:dart_kafka/dart_kafka.dart';
 
 void main() async {
   List<Broker> brokers = [
+    // Broker(host: '192.168.10.57', port: 29092),
     Broker(host: '192.168.200.131', port: 29092),
     Broker(host: '192.168.200.131', port: 29093),
     Broker(host: '192.168.200.131', port: 29094),
@@ -18,21 +19,20 @@ void main() async {
 
   KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
 
-  consumer.sendFetchRequest(
-      clientId: 'dart-kafka',
-      apiVersion: 8,
-      async: true,
-      topics: [
-        Topic(topicName: 'test-topic', partitions: [
-          Partition(id: 0, fetchOffset: 0),
-        ])
-      ]);
+  // consumer.sendFetchRequest(
+  //     clientId: 'dart-kafka',
+  //     apiVersion: 8,
+  //     async: true,
+  //     topics: [
+  //       Topic(topicName: 'test-topic', partitions: [
+  //         Partition(id: 0, fetchOffset: 0),
+  //       ])
+  //     ]);
 
   KafkaAdmin admin = kafka.admin;
   await admin.updateTopicsMetadata(
       topics: [
-        'test-topic',
-        'notifications',
+        'testeomnilightvitaverse.status',
       ],
       async: false,
       apiVersion: 9,
@@ -42,18 +42,78 @@ void main() async {
       includeTopicAuthorizedOperations: false,
       correlationId: null);
 
-  dynamic res = await consumer.sendFetchRequest(
-      clientId: 'dart-kafka',
-      apiVersion: 8,
-      async: false,
-      topics: [
-        Topic(topicName: 'notifications', partitions: [
-          Partition(id: 0, fetchOffset: 0),
-        ])
-      ]);
+  // dynamic res = await consumer.sendFetchRequest(
+  //     clientId: 'dart-kafka',
+  //     apiVersion: 8,
+  //     async: false,
+  //     topics: [
+  //       Topic(topicName: 'notifications', partitions: [
+  //         Partition(id: 0, fetchOffset: 0),
+  //       ])
+  //     ]);
 
-  print("*********************************************");
-  print("[SYNC Request]: $res");
+  // print("*********************************************");
+  // print("[SYNC Request]: $res");
+
+  // await consumer.sendFindGroupCoordinatorRequest(
+  //   groups: ['testeomnilightvitaverse'],
+  //   apiVersion: 6,
+  //   async: true,
+  //   clientId: null,
+  //   coordinatorType: COORDINATOR_TYPE_GROUP,
+  //   correlationId: null,
+  // );
+
+  // consumer.sendHeartbeatRequest(
+  //   apiVersion: 4,
+  //   groupId: 'testeomnilightvitaverse',
+  //   generationId: 1,
+  //   memberId: 'cthulhu',
+  // );
+
+  dynamic res = await consumer.sendJoinGroupRequest(
+    groupId: 'testeomnilightvitaverse',
+    sessionTimeoutMs: 1800000,
+    rebalanceTimeoutMs: 1500,
+    memberId: '',
+    protocolType: 'consumer',
+    protocols: [
+      Protocol(
+          name: 'roundrobin',
+          metadata: ProtocolMetadata(
+              version: 1, topics: ['testeomnilightvitaverse.status']))
+    ],
+    apiVersion: 9,
+    async: false,
+    correlationId: null,
+    groupInstanceId: null,
+    reason: null,
+  );
+
+  if (res is JoinGroupResponse) {
+    if (res.errorCode == 79) {
+      res = await consumer.sendJoinGroupRequest(
+        groupId: 'testeomnilightvitaverse',
+        sessionTimeoutMs: 1800000,
+        rebalanceTimeoutMs: 1500,
+        memberId: res.memberId,
+        protocolType: 'consumer',
+        protocols: [
+          Protocol(
+              name: 'roundrobin',
+              metadata: ProtocolMetadata(
+                  version: 1, topics: ['testeomnilightvitaverse.status']))
+        ],
+        apiVersion: 9,
+        async: false,
+        correlationId: null,
+        groupInstanceId: null,
+        reason: null,
+      );
+
+      print(res);
+    }
+  }
 
   kafka.close();
   return;

@@ -77,24 +77,32 @@ class KafkaClient {
     return _cluster.getAnyBroker();
   }
 
-  Future<dynamic> enqueueRequest(
-      {required Uint8List message,
-      required int correlationId,
-      required int apiKey,
-      required int apiVersion,
-      required Deserializer function,
-      String? topic,
-      int? partition,
-      bool async = true}) async {
+  Socket? getBrokerByHost({required String host, required int port}) {
+    return _cluster.getBrokerByHost(host: host, port: port);
+  }
+
+  Future<dynamic> enqueueRequest({
+    required Uint8List message,
+    required int correlationId,
+    required int apiKey,
+    required int apiVersion,
+    required Deserializer function,
+    String? topic,
+    int? partition,
+    bool async = true,
+    Socket? broker,
+  }) async {
     Future<dynamic> res = _trafficControler.enqueuePendindRequest(
-        message: message,
-        correlationId: correlationId,
-        apiKey: apiKey,
-        apiVersion: apiVersion,
-        function: function,
-        topic: topic,
-        partition: partition,
-        async: async);
+      message: message,
+      correlationId: correlationId,
+      apiKey: apiKey,
+      apiVersion: apiVersion,
+      function: function,
+      topic: topic,
+      partition: partition,
+      async: async,
+      broker: broker,
+    );
 
     if (async) return;
 

@@ -101,17 +101,7 @@ class TrafficControler {
     MessageHeader header = _extractMessageHeader(
         response: response, apiKey: req.apiKey, apiVersion: req.apiVersion);
 
-    print("Requests pendentes: $_processingRequests");
-
-    // if (!_processingRequests.containsKey(header.correlationId)) {
-    //   _pendingResponses.addAll({
-    //     header.correlationId: {
-    //       'apiVersion': header.apiVersion,
-    //       'message': byteData.buffer.asUint8List().sublist(header.offset)
-    //     }
-    //   });
-    //   return;
-    // }
+    // print("Requests pendentes: $_processingRequests");
 
     final int apiVersion = _processingRequests[correlationId]!.apiVersion;
     final deserializer = _processingRequests[correlationId]!.function;
@@ -146,7 +136,8 @@ class TrafficControler {
       required int apiVersion,
       required Deserializer function,
       String? topic,
-      int? partition}) async {
+      int? partition,
+      Socket? broker}) async {
     _Request? existing = _pendingRequestQueue.firstWhereOrNull(
       (req) => req.correlationId == correlationId,
     );
@@ -166,14 +157,16 @@ class TrafficControler {
     _responseCompleters[correlationId] = completer;
 
     _pendingRequestQueue.add(_Request(
-        apiKey: apiKey,
-        apiVersion: apiVersion,
-        function: function,
-        message: message,
-        partition: partition,
-        topic: topic,
-        async: async,
-        correlationId: correlationId));
+      apiKey: apiKey,
+      apiVersion: apiVersion,
+      function: function,
+      message: message,
+      partition: partition,
+      topic: topic,
+      async: async,
+      correlationId: correlationId,
+      broker: broker,
+    ));
 
     if (_pendingRequestQueue.length == 1) {
       Future.microtask(() => _drainPendingRequestQueue());
@@ -249,7 +242,7 @@ class TrafficControler {
     int headerVersion = MessageHeaderVersion.responseHeaderVersion(
         apiKey: apiKey, apiVersion: apiVersion);
 
-    if (headerVersion > 1) {
+    if (headerVersion > 0) {
       final int taggedField = byteData.getInt8(offset);
       offset += 1;
     }
@@ -284,14 +277,16 @@ class TrafficControler {
   }
 
   Future<void> sendRequestToBroker({required _Request req}) async {
-    Socket broker = API_REQUIRE_SPECIFIC_BROKER[req.apiKey]!
-        ? cluster.getBrokerForPartition(
-            topic: req.topic!, partition: req.partition!)
-        : cluster.getAnyBroker();
+    Socket broker = req.broker ??
+        (API_REQUIRE_SPECIFIC_BROKER[req.apiKey]!
+            ? cluster.getBrokerForPartition(
+                topic: req.topic!, partition: req.partition!)
+            : cluster.getAnyBroker());
     try {
       // print("**************************************");
+      // print("Broker: ${broker.address.host}:${broker.remotePort}");
       // print("Message sent: ${req.message}");
-      // print("**************************************");
+      // print("**************************************");;
       broker.add(req.message);
     } catch (e, stackTrace) {
       throw Exception(
@@ -310,16 +305,19 @@ class _Request {
   final int? partition;
   final int correlationId;
   final bool async;
+  final Socket? broker;
 
-  _Request(
-      {required this.message,
-      required this.apiKey,
-      required this.apiVersion,
-      required this.function,
-      this.topic,
-      this.partition,
-      required this.async,
-      required this.correlationId});
+  _Request({
+    required this.message,
+    required this.apiKey,
+    required this.apiVersion,
+    required this.function,
+    this.topic,
+    this.partition,
+    this.broker,
+    required this.async,
+    required this.correlationId,
+  });
 }
 
 class _RetryRequest {

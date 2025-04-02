@@ -81,4 +81,6 @@ const API_REQUIRE_SPECIFIC_BROKER = {
   API_VERSIONS: false,
   INIT_PRODUCER_ID: false,
   JOIN_GROUP: false,
+  FIND_COORDINATOR: false,
+  HEARTBEAT: false,
 };
