@@ -73,10 +73,9 @@ const REMOVE_RAFT_VOTER = 81;
 
 const API_REQUIRE_SPECIFIC_BROKER = {
   FETCH: true,
-  PRODUCE: true, 
+  PRODUCE: true,
   LIST_OFFSETS: true,
   DESCRIBE_PRODUCERS: true,
-
   METADATA: false,
   API_VERSIONS: false,
   INIT_PRODUCER_ID: false,

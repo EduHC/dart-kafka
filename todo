@@ -10,6 +10,11 @@
 [] Create a singleton to initiate the Utils, Encoder and Decoder classes and reuse 'em in everywhere possible
 [] Create an error handler for every message return.
 [] Split the "Partition" model to each usage it has with different fields
+[] Adjust the JoinGroup API
+[] Implement the OffsetFetch API
+[] Implement the OffsetCommit API
+[] Implement the FindGroupCoordinator API
+
 
 [-] Implement the LeaveGroup API
 [] Implement the SyncGroup API

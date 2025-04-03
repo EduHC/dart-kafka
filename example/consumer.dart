@@ -18,6 +18,17 @@ void main() async {
   );
 
   KafkaConsumer consumer = KafkaConsumer(kafka: kafka);
+
+  // consumer.sendFetchRequest(
+  //     clientId: 'dart-kafka',
+  //     apiVersion: 8,
+  //     async: true,
+  //     topics: [
+  //       Topic(topicName: 'test-topic', partitions: [
+  //         Partition(id: 0, fetchOffset: 0),
+  //       ])
+  //     ]);
+
   KafkaAdmin admin = kafka.admin;
 
   await admin.updateTopicsMetadata(
