@@ -93,7 +93,7 @@ class Encoder {
   }
 
   Uint8List tagBuffer() {
-    return Uint8List(0);
+    return int8(0);
   }
 
   Uint8List encodeUnsignedVarint(int value) {
@@ -316,5 +316,10 @@ class Encoder {
       ...uint32(utils.crc32c(base)),
       ...base
     ]);
+  }
+
+  Uint8List bytes(Uint8List value) {
+    final length = int32(value.length);
+    return Uint8List.fromList([...length, ...value]);
   }
 }

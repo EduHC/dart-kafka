@@ -1,6 +1,7 @@
 import 'dart:typed_data';
-import 'package:dart_kafka/src/models/components/protocol.dart';
-import 'package:dart_kafka/src/models/responses/join_group_response.dart';
+import 'package:dart_kafka/dart_kafka.dart';
+import 'package:dart_kafka/src/definitions/errors.dart';
+import 'package:dart_kafka/src/definitions/message_headers_version.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
@@ -23,46 +24,98 @@ class KafkaJoinGroupApi {
       required String protocolType,
       required List<Protocol> protocols,
       String? reason,
-      required int apiVersion}) {
+      required int apiVersion,
+      String? clientId}) {
     final byteBuffer = BytesBuilder();
 
-    byteBuffer.add(encoder.compactString(groupId));
+    if (apiVersion > 5) {
+      byteBuffer.add(encoder.compactString(groupId));
+    } else {
+      byteBuffer.add(encoder.string(groupId));
+    }
+
     byteBuffer.add(encoder.int32(sessionTimeoutMs));
     byteBuffer.add(encoder.int32(rebalanceTimeoutMs));
-    byteBuffer.add(encoder.compactString(memberId));
-    byteBuffer.add(encoder.compactNullableString(groupInstanceId));
-    byteBuffer.add(encoder.compactString(protocolType));
-    byteBuffer.add(encoder.compactArrayLength(protocols.length));
 
-    for (final protocol in protocols) {
-      byteBuffer.add(encoder.compactString(protocol.name));
+    if (apiVersion > 5) {
+      byteBuffer.add(encoder.compactString(memberId));
+    } else {
+      byteBuffer.add(encoder.string(memberId));
+    }
 
-      final BytesBuilder metadataBytes = BytesBuilder();
-      metadataBytes.add(encoder.int16(protocol.metadata.version));
-      metadataBytes.add([protocol.metadata.topics.length]);
-
-      for (String topic in protocol.metadata.topics) {
-        metadataBytes.add(topic.codeUnits);
-      }
-      byteBuffer.add(encoder.compactBytes(metadataBytes.toBytes()));
-
-      if (protocol.metadata.userDataBytes != null) {
-        byteBuffer.add(protocol.metadata.userDataBytes!);
+    if (apiVersion > 4) {
+      if (apiVersion > 5) {
+        byteBuffer.add(encoder.compactNullableString(groupInstanceId));
+      } else {
+        byteBuffer.add(encoder.nullableString(groupInstanceId));
       }
     }
 
-    // byteBuffer.add(utils.compactNullableString(reason));
+    if (apiVersion > 5) {
+      byteBuffer.add(encoder.compactString(protocolType));
+    } else {
+      byteBuffer.add(encoder.string(protocolType));
+    }
 
-    final message = Uint8List.fromList([
-      ...encoder.int32(byteBuffer.toBytes().length),
+    if (apiVersion > 5) {
+      byteBuffer.add(encoder.compactArrayLength(protocols.length));
+    } else {
+      byteBuffer.add(encoder.int32(protocols.length));
+    }
+
+    for (final protocol in protocols) {
+      if (apiVersion > 5) {
+        byteBuffer.add(encoder.compactString(protocol.name));
+      } else {
+        byteBuffer.add(encoder.string(protocol.name));
+      }
+
+      BytesBuilder? metadata = BytesBuilder();
+      metadata.add(encoder.int16(protocol.metadata.version));
+
+      final topics = protocol.metadata.topics;
+      metadata.add(encoder.int32(topics.length));
+      for (int i = 0; i < topics.length; i++) {
+        metadata.add(encoder.string(topics[i]));
+      }
+      metadata.add(encoder.compactBytes(Uint8List.fromList([])));
+
+      final metadataMsg = metadata.toBytes();
+      if (apiVersion > 5) {
+        byteBuffer.add(encoder.compactBytes(metadataMsg));
+      } else {
+        byteBuffer.add(encoder.bytes(metadataMsg));
+      }
+
+      metadata.clear();
+
+      if (apiVersion > 5) {
+        byteBuffer.add(encoder.tagBuffer());
+      }
+    }
+
+    if (apiVersion > 7) {
+      byteBuffer.add(encoder.compactNullableString(reason));
+    }
+
+    if (apiVersion > 5) {
+      byteBuffer.add(encoder.tagBuffer());
+    }
+
+    return Uint8List.fromList([
+      ...encoder.writeMessageHeader(
+          version: MessageHeaderVersion.requestHeaderVersion(
+              apiVersion: apiVersion, apiKey: apiKey),
+          messageLength: byteBuffer.toBytes().length,
+          apiKey: apiKey,
+          apiVersion: apiVersion,
+          correlationId: correlationId,
+          clientId: clientId),
       ...byteBuffer.toBytes()
     ]);
-
-    final buffer = ByteData.sublistView(message);
-    return message;
   }
 
-  /// Deserialize the JoinGroupResponse (Version 9)
+  /// Deserialize the JoinGroupResponse
   dynamic deserialize(Uint8List data, int apiVersion) {
     final buffer = ByteData.sublistView(data);
     int offset = 0;
@@ -76,46 +129,113 @@ class KafkaJoinGroupApi {
     final generationId = buffer.getInt32(offset);
     offset += 4;
 
-    final protocolType = decoder.readCompactString(buffer, offset);
-    offset += protocolType.bytesRead;
+    ({int bytesRead, String? value}) protocolType;
+    if (apiVersion > 6) {
+      protocolType = decoder.readCompactNullableString(buffer, offset);
+      offset += protocolType.bytesRead;
+    } else {
+      protocolType = (bytesRead: 0, value: null);
+    }
 
-    final protocolName = decoder.readCompactString(buffer, offset);
-    offset += protocolName.bytesRead;
+    ({int bytesRead, String? value}) protocolName;
+    if (apiVersion > 6) {
+      protocolName = decoder.readCompactNullableString(buffer, offset);
+      offset += protocolName.bytesRead;
+    } else if (apiVersion > 5) {
+      protocolName = decoder.readCompactString(buffer, offset);
+      offset += protocolName.bytesRead;
+    } else {
+      protocolName = decoder.readString(buffer, offset);
+      offset += protocolName.bytesRead;
+    }
 
-    final leader = decoder.readCompactString(buffer, offset);
-    offset += leader.bytesRead;
+    ({int bytesRead, String? value}) leader;
+    if (apiVersion > 5) {
+      leader = decoder.readCompactString(buffer, offset);
+      offset += leader.bytesRead;
+    } else {
+      leader = decoder.readString(buffer, offset);
+      offset += leader.bytesRead;
+    }
 
-    final memberId = decoder.readCompactString(buffer, offset);
-    offset += memberId.bytesRead;
+    bool skipAssignment;
+    if (apiVersion > 8) {
+      skipAssignment = buffer.getInt8(offset) != 0;
+      offset += 1;
+    } else {
+      skipAssignment = false;
+    }
+
+    ({int bytesRead, String? value}) memberId;
+    if (apiVersion > 5) {
+      memberId = decoder.readCompactString(buffer, offset);
+      offset += memberId.bytesRead;
+    } else {
+      memberId = decoder.readString(buffer, offset);
+      offset += memberId.bytesRead;
+    }
 
     final membersLength = decoder.readCompactArrayLength(buffer, offset);
     offset += membersLength.bytesRead;
 
-    final members = <Map<String, dynamic>>[];
+    final members = <Member>[];
     for (int i = 0; i < membersLength.value; i++) {
-      final memberId = decoder.readCompactString(buffer, offset);
-      offset += memberId.bytesRead;
+      ({int bytesRead, String? value}) memberId;
+      if (apiVersion > 5) {
+        memberId = decoder.readCompactString(buffer, offset);
+        offset += memberId.bytesRead;
+      } else {
+        memberId = decoder.readString(buffer, offset);
+        offset += memberId.bytesRead;
+      }
 
-      final groupInstanceId = decoder.readCompactNullableString(buffer, offset);
-      offset += groupInstanceId.bytesRead;
+      ({int bytesRead, String? value}) groupInstanceId;
+      if (apiVersion < 5) {
+        groupInstanceId = (bytesRead: 0, value: null);
+      } else if (apiVersion > 5) {
+        groupInstanceId = decoder.readCompactNullableString(buffer, offset);
+        offset += groupInstanceId.bytesRead;
+      } else {
+        groupInstanceId = decoder.readNullableString(buffer, offset);
+        offset += groupInstanceId.bytesRead;
+      }
 
-      final metadata = decoder.readCompactBytes(buffer, offset);
-      offset += metadata.bytesRead;
+      ({int bytesRead, Uint8List value}) metadata;
+      if (apiVersion > 5) {
+        metadata = decoder.readCompactBytes(buffer, offset);
+        offset += metadata.bytesRead;
+      } else {
+        metadata = decoder.readBytes(buffer, offset);
+        offset += metadata.bytesRead;
+      }
 
-      members.add({
-        'member_id': memberId.value,
-        'group_instance_id': groupInstanceId.value,
-        'metadata': metadata.value,
-      });
+      if (apiVersion > 5) {
+        final mTaggedField = buffer.getInt8(offset);
+        offset += 1;
+      }
+
+      members.add(Member(
+          memberId: memberId.value!,
+          metadata: metadata.value,
+          groupInstanceId: groupInstanceId.value));
     }
 
-    decoder.readTagBuffer(buffer, offset);
+    if (apiVersion > 5) {
+      final taggedField = decoder.readTagBuffer(buffer, offset);
+      offset += 1;
+    }
 
     return JoinGroupResponse(
-        throttleTimeMs: throttleTimeMs,
-        errorCode: errorCode,
-        generationId: generationId,
-        leader: leader.value,
-        memberId: memberId.value);
+      throttleTimeMs: throttleTimeMs,
+      errorCode: errorCode,
+      errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+      generationId: generationId,
+      leader: leader.value!,
+      memberId: memberId.value!,
+      members: members,
+      protocolName: protocolName.value,
+      protocolType: protocolType.value,
+      skipAssignment: skipAssignment,
+    );
   }
 }

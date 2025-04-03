@@ -97,8 +97,12 @@ class KafkaCluster {
     return _sockets.values.first;
   }
 
+  Socket? getBrokerByHost({required String host, required int port}) {
+    return _sockets['$host:$port'];
+  }
+
   void updateTopicsBroker({required MetadataResponse metadata}) {
-    print("Topicos antes de atualizar: ${_topicsBrokers.toString()}");
+    // print("Topicos antes de atualizar: ${_topicsBrokers.toString()}");
     _topicsBrokers.clear();
     Map? brokers = {
       for (var b in metadata.brokers) b.nodeId: "${b.host}:${b.port}"
@@ -114,7 +118,7 @@ class KafkaCluster {
       }
     }
 
-    print("Topicos dps de atualizaR: ${_topicsBrokers.toString()}");
+    // print("Topicos dps de atualizaR: ${_topicsBrokers.toString()}");
     brokers.clear();
     brokers = null;
   }

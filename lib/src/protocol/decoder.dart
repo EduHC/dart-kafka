@@ -66,13 +66,11 @@ class Decoder {
     return (value: value, bytesRead: bytesRead);
   }
 
-  ({String value, int bytesRead}) readCompactString(
-      ByteData buffer, int offset) {
+  ({String value, int bytesRead}) readCompactString(ByteData buffer, int offset) {
     final decoded = decodeUnsignedVarint(buffer, offset);
-    final length = decoded.value;
-    final string = String.fromCharCodes(
-        buffer.buffer.asUint8List(offset + decoded.bytesRead, length - 1));
-    return (value: string, bytesRead: decoded.bytesRead + length - 1);
+    final length = decoded.value > 0 ? (decoded.value - 1) : decoded.value;
+    final string = String.fromCharCodes(buffer.buffer.asUint8List(offset + decoded.bytesRead, length));
+    return (value: string, bytesRead: decoded.bytesRead + length);
   }
 
   ({int value, int bytesRead}) decodeUnsignedVarint(
@@ -106,13 +104,18 @@ class Decoder {
     return (value: string, bytesRead: decoded.bytesRead + length - 1);
   }
 
-  ({Uint8List value, int bytesRead}) readCompactBytes(
-      ByteData buffer, int offset) {
+  ({Uint8List value, int bytesRead}) readCompactBytes(ByteData buffer, int offset) {
     final decoded = decodeUnsignedVarint(buffer, offset);
     final length = decoded.value;
-    final value =
-        buffer.buffer.asUint8List(offset + decoded.bytesRead, length - 1);
+    final value = buffer.buffer.asUint8List(offset + decoded.bytesRead, length - 1);
     return (value: value, bytesRead: decoded.bytesRead + length - 1);
+  }
+
+  ({Uint8List value, int bytesRead}) readBytes(ByteData buffer, int offset) {
+    final length = buffer.getInt32(offset);
+    offset += 4;
+    final value = buffer.buffer.asUint8List(offset + length, length);
+    return (value: value, bytesRead: 4 + length);
   }
 
   ({int value, int bytesRead}) readCompactArrayLength(
@@ -130,6 +133,20 @@ class Decoder {
     offset += 2;
     final value =
         String.fromCharCodes(buffer.buffer.asUint8List(offset, length));
+    return (value: value, bytesRead: length + 2);
+  }
+
+  ({String? value, int bytesRead}) readNullableString(
+      ByteData buffer, int offset) {
+    final length = buffer.getInt16(offset);
+    offset += 2;
+    String? value;
+
+    if (length == -1) {
+      value = null;
+    } else {
+      value = String.fromCharCodes(buffer.buffer.asUint8List(offset, length));
+    }
     return (value: value, bytesRead: length + 2);
   }
 }

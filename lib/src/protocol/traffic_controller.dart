@@ -61,8 +61,9 @@ class TrafficControler {
       }
 
       // Extract complete message
-      final completeMessage =
-          Uint8List.fromList(_buffer.sublist(0, messageLength + 4));
+      final completeMessage = Uint8List.fromList(
+        _buffer.sublist(0, messageLength + 4),
+      );
       _buffer.removeRange(0, messageLength + 4);
 
       _messageQueue.add(completeMessage);
@@ -99,19 +100,10 @@ class TrafficControler {
     if (req == null) return;
 
     MessageHeader header = _extractMessageHeader(
-        response: response, apiKey: req.apiKey, apiVersion: req.apiVersion);
-
-    print("Requests pendentes: $_processingRequests");
-
-    // if (!_processingRequests.containsKey(header.correlationId)) {
-    //   _pendingResponses.addAll({
-    //     header.correlationId: {
-    //       'apiVersion': header.apiVersion,
-    //       'message': byteData.buffer.asUint8List().sublist(header.offset)
-    //     }
-    //   });
-    //   return;
-    // }
+      response: response,
+      apiKey: req.apiKey,
+      apiVersion: req.apiVersion,
+    );
 
     final int apiVersion = _processingRequests[correlationId]!.apiVersion;
     final deserializer = _processingRequests[correlationId]!.function;
@@ -125,28 +117,34 @@ class TrafficControler {
     }
 
     if (entityAnalisys.hasError) {
-      _enqueueRetryRequest(_RetryRequest(
+      _enqueueRetryRequest(
+        _RetryRequest(
           correlationId: correlationId,
-          req: _processingRequests[correlationId]!));
+          req: _processingRequests[correlationId]!,
+        ),
+      );
       return;
     }
 
     completeRequest(
-        correlationId: correlationId,
-        entity: entity,
-        hasToRetry: entityAnalisys.hasError);
+      correlationId: correlationId,
+      entity: entity,
+      hasToRetry: entityAnalisys.hasError,
+    );
   }
 
   // Handle Messages from Application
-  Future<dynamic> enqueuePendindRequest<T>(
-      {bool async = true,
-      required Uint8List message,
-      required int correlationId,
-      required int apiKey,
-      required int apiVersion,
-      required Deserializer function,
-      String? topic,
-      int? partition}) async {
+  Future<dynamic> enqueuePendindRequest<T>({
+    bool async = true,
+    required Uint8List message,
+    required int correlationId,
+    required int apiKey,
+    required int apiVersion,
+    required Deserializer function,
+    String? topic,
+    int? partition,
+    Socket? broker,
+  }) async {
     _Request? existing = _pendingRequestQueue.firstWhereOrNull(
       (req) => req.correlationId == correlationId,
     );
@@ -166,14 +164,16 @@ class TrafficControler {
     _responseCompleters[correlationId] = completer;
 
     _pendingRequestQueue.add(_Request(
-        apiKey: apiKey,
-        apiVersion: apiVersion,
-        function: function,
-        message: message,
-        partition: partition,
-        topic: topic,
-        async: async,
-        correlationId: correlationId));
+      apiKey: apiKey,
+      apiVersion: apiVersion,
+      function: function,
+      message: message,
+      partition: partition,
+      topic: topic,
+      async: async,
+      correlationId: correlationId,
+      broker: broker,
+    ));
 
     if (_pendingRequestQueue.length == 1) {
       Future.microtask(() => _drainPendingRequestQueue());
@@ -218,10 +218,11 @@ class TrafficControler {
     _processingRequests[correlationId] = req;
   }
 
-  void completeRequest(
-      {required int correlationId,
-      required dynamic entity,
-      bool hasToRetry = false}) {
+  void completeRequest({
+    required int correlationId,
+    required dynamic entity,
+    bool hasToRetry = false,
+  }) {
     // print("Entrou p/ completar a request");
     if (!_processingRequests.containsKey(correlationId)) return;
     if (hasToRetry) return;
@@ -239,17 +240,20 @@ class TrafficControler {
     }
   }
 
-  MessageHeader _extractMessageHeader(
-      {required Uint8List response,
-      required int apiKey,
-      required int apiVersion}) {
+  MessageHeader _extractMessageHeader({
+    required Uint8List response,
+    required int apiKey,
+    required int apiVersion,
+  }) {
     final byteData = ByteData.sublistView(response);
     int offset = 8;
 
     int headerVersion = MessageHeaderVersion.responseHeaderVersion(
-        apiKey: apiKey, apiVersion: apiVersion);
+      apiKey: apiKey,
+      apiVersion: apiVersion,
+    );
 
-    if (headerVersion > 1) {
+    if (headerVersion > 0) {
       final int taggedField = byteData.getInt8(offset);
       offset += 1;
     }
@@ -278,20 +282,24 @@ class TrafficControler {
     while (_retryRequestsQueue.isNotEmpty) {
       var retryRequest = _retryRequestsQueue.removeFirst();
       _enqueueProcessingRequest(
-          correlationId: retryRequest.correlationId, req: retryRequest.req);
+        correlationId: retryRequest.correlationId,
+        req: retryRequest.req,
+      );
       sendRequestToBroker(req: retryRequest.req);
     }
   }
 
   Future<void> sendRequestToBroker({required _Request req}) async {
-    Socket broker = API_REQUIRE_SPECIFIC_BROKER[req.apiKey]!
-        ? cluster.getBrokerForPartition(
-            topic: req.topic!, partition: req.partition!)
-        : cluster.getAnyBroker();
+    Socket broker = req.broker ??
+        (API_REQUIRE_SPECIFIC_BROKER[req.apiKey]!
+            ? cluster.getBrokerForPartition(
+                topic: req.topic!, partition: req.partition!)
+            : cluster.getAnyBroker());
     try {
       // print("**************************************");
+      // print("Broker: ${broker.address.host}:${broker.remotePort}");
       // print("Message sent: ${req.message}");
-      // print("**************************************");
+      // print("**************************************");;
       broker.add(req.message);
     } catch (e, stackTrace) {
       throw Exception(
@@ -310,21 +318,27 @@ class _Request {
   final int? partition;
   final int correlationId;
   final bool async;
+  final Socket? broker;
 
-  _Request(
-      {required this.message,
-      required this.apiKey,
-      required this.apiVersion,
-      required this.function,
-      this.topic,
-      this.partition,
-      required this.async,
-      required this.correlationId});
+  _Request({
+    required this.message,
+    required this.apiKey,
+    required this.apiVersion,
+    required this.function,
+    this.topic,
+    this.partition,
+    this.broker,
+    required this.async,
+    required this.correlationId,
+  });
 }
 
 class _RetryRequest {
   final int correlationId;
   final _Request req;
 
-  _RetryRequest({required this.correlationId, required this.req});
+  _RetryRequest({
+    required this.correlationId,
+    required this.req,
+  });
 }

@@ -95,7 +95,7 @@ class KafkaMetadataApi {
   /// Method to deserialize the MetadataResponse from a Byte Array
   dynamic deserialize(Uint8List data, int apiVersion) {
     final buffer = ByteData.sublistView(data);
-    int offset = 1;
+    int offset = 0;
 
     final int throttleTimeMs = buffer.getInt32(offset);
     offset += 4;
