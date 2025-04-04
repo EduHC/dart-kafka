@@ -74,10 +74,31 @@ class KafkaSyncGroupApi {
       }
 
       // here add the assignmentSync.assignment
-      BytesBuilder assignmentBuffer = BytesBuilder();
+      BytesBuilder? assignmentBuffer = BytesBuilder();
+      if (assignmentSync.assignment != null) {
+        assignmentBuffer.add(encoder.int16(assignmentSync.assignment!.version));
+        assignmentBuffer.add(
+          encoder.int32(assignmentSync.assignment!.topics.length),
+        );
+
+        for (AssignmentTopicData topic in assignmentSync.assignment!.topics) {
+          assignmentBuffer.add(encoder.string(topic.topicName));
+          assignmentBuffer.add(encoder.int32(topic.partitions.length));
+
+          for (int partition in topic.partitions) {
+            assignmentBuffer.add(encoder.int32(partition));
+          }
+        }
+
+        assignmentBuffer.add(
+          encoder.int32((assignmentSync.assignment!.userData?.length) ?? 0),
+        );
+      }
+
       if (apiVersion > 3) {
-        byteBuffer
-            .add(encoder.compactArrayLength(assignmentBuffer.toBytes().length));
+        byteBuffer.add(
+          encoder.compactArrayLength(assignmentBuffer.toBytes().length),
+        );
       } else {
         byteBuffer.add(encoder.int32(assignmentBuffer.toBytes().length));
       }
@@ -109,7 +130,7 @@ class KafkaSyncGroupApi {
     ]);
   }
 
-  /// Deserialize the HeartbeatResponse
+  /// Deserialize the SyncGroupResponse
   dynamic deserialize(Uint8List data, int apiVersion) {
     final buffer = ByteData.sublistView(data);
     int offset = 0;
@@ -143,8 +164,41 @@ class KafkaSyncGroupApi {
       length = (bytesRead: 4, value: len);
     }
 
-    List<int> assignment =
-        buffer.buffer.asUint8List().sublist(offset, offset + length.value);
+    int? version;
+    int? topicsLen;
+    List<AssignmentTopicData> topics = [];
+    Assignment? assignment;
+    if (length.value > 0) {
+      version = buffer.getInt16(offset);
+      offset += 2;
+
+      topicsLen = buffer.getInt32(offset);
+      offset += 4;
+
+      for (int i = 0; i < topicsLen; i++) {
+        final topicName = decoder.readString(buffer, offset);
+        offset += topicName.bytesRead;
+
+        final int partitionsLen = buffer.getInt32(offset);
+        offset += 4;
+
+        final List<int> partitions = [];
+        for (int j = 0; j < partitionsLen; j++) {
+          partitions.add(buffer.getInt32(offset));
+          offset += 4;
+        }
+
+        topics.add(AssignmentTopicData(
+          topicName: topicName.value,
+          partitions: partitions,
+        ));
+      }
+
+      assignment = Assignment(
+        version: version,
+        topics: topics,
+      );
+    }
 
     int? taggedField;
     if (apiVersion > 3) {

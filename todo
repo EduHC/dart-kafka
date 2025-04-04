@@ -10,15 +10,15 @@
 [] Create a singleton to initiate the Utils, Encoder and Decoder classes and reuse 'em in everywhere possible
 [] Create an error handler for every message return.
 [] Split the "Partition" model to each usage it has with different fields
-[] Adjust the JoinGroup API
-[] Implement the OffsetFetch API
-[] Implement the OffsetCommit API
-[] Implement the FindGroupCoordinator API
-
 
 [-] Implement the LeaveGroup API
-[] Implement the SyncGroup API
+
 [] Creathe the "subscribe" method that handles the Group Coordination logic.
+    - Create in the KafkaConsumer fields to handle the ConsumerGroup logic
+        -- MemberId Leader
+        -- Broker Leader
+        -- MemberId + Topic + Partition
+
 [] Implement the OffsetCommit API
 [] Implement the OffsetFetch API
 [] Implement the ListGroup API
@@ -29,5 +29,7 @@
 [x] Refactor the Request and Response controllers to be one single class that handles the traffic
 [x] Adjust the JoinGroup API
 [x] Implement the FindGroupCoordinator API
+[x] Adjust the JoinGroup API
+[x] Implement the SyncGroup API
 
 

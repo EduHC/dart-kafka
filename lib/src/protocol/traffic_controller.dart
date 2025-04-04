@@ -28,11 +28,12 @@ class TrafficControler {
 
   late final ErrorInterceptor errorInterceptor;
 
-  TrafficControler(
-      {required this.cluster,
-      required this.eventController,
-      required this.admin,
-      required this.kafka}) {
+  TrafficControler({
+    required this.cluster,
+    required this.eventController,
+    required this.admin,
+    required this.kafka,
+  }) {
     errorInterceptor = ErrorInterceptor(kafka: kafka, admin: admin);
   }
 

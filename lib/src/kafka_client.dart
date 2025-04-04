@@ -17,21 +17,34 @@ class KafkaClient {
   final List<Broker> brokers = [];
   final Utils utils = Utils();
   final Encoder encoder = Encoder();
+  final String? clientId;
   late final KafkaAdmin _admin;
+  late final KafkaConsumer _consumer;
+  late final KafkaProducer _producer;
 
   Stream get eventStream => _eventController.stream.asBroadcastStream();
   bool get hasPendingProcesses => _trafficControler.hasPendingProcesses;
   List<String> get topicsInUse => _cluster.topicsInUse;
   KafkaAdmin get admin => _admin;
+  KafkaConsumer get consumer => _consumer;
+  KafkaProducer get producer => _producer;
 
-  bool started = false;
-  bool consumerStarted = false;
-  bool producerStarted = false;
-  bool adminStarted = false;
+  bool _started = false;
+  bool _consumerStarted = false;
+  bool _producerStarted = false;
+  bool _adminStarted = false;
+
+  bool get isKafkaStarted => _started;
+  bool get isConsumerStarted => _consumerStarted;
+  bool get isProducerStarted => _producerStarted;
+  bool get isAdminStarted => _adminStarted;
 
   /// @Parameter brokers
   ///    A list containing only the Host Address and the Port to access N Kafka Brokers
-  KafkaClient({required List<Broker> brokers}) {
+  KafkaClient({
+    required List<Broker> brokers,
+    this.clientId,
+  }) {
     _cluster.setBrokers(brokers);
     _admin = KafkaAdmin(kafka: this);
     _trafficControler = TrafficControler(
@@ -42,19 +55,17 @@ class KafkaClient {
   }
 
   Future<void> connect() async {
-    if (started) return;
+    if (_started) return;
     await _cluster.connect(responseHandler: _handleResponse);
-    started = true;
+    _started = true;
   }
 
   Future<void> close() async {
-    print("Acionada função para fechar.");
     while (hasPendingProcesses) {
       await Future.delayed(Duration(seconds: 1));
       continue;
     }
     _cluster.close();
-    print("Fechou.");
   }
 
   // Request/Response controllers
@@ -64,8 +75,10 @@ class KafkaClient {
   }
 
   // Broker Related functions
-  Socket getBrokerForPartition(
-      {required String topic, required int partition}) {
+  Socket getBrokerForPartition({
+    required String topic,
+    required int partition,
+  }) {
     return _cluster.getBrokerForPartition(topic: topic, partition: partition);
   }
 

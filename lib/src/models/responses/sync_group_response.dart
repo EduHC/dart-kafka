@@ -1,10 +1,12 @@
+import 'package:dart_kafka/dart_kafka.dart';
+
 class SyncGroupResponse {
   final int? throttleTimeMs;
   final int errorCode;
   final String? errorMessage;
   final String? protocolType;
   final String? protocolName;
-  final List<int> assignment;
+  final Assignment? assignment;
 
   SyncGroupResponse({
     this.throttleTimeMs,

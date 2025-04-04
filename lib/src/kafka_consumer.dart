@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -10,10 +11,13 @@ import 'package:dart_kafka/src/apis/kafka_list_offset_api.dart';
 import 'package:dart_kafka/src/apis/kafka_sync_group_api.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/definitions/coordinator_types.dart';
+import 'package:dart_kafka/src/models/responses/sync_group_response.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
+import 'package:dart_kafka/src/protocol/assigner.dart';
 
 class KafkaConsumer {
   final KafkaClient kafka;
+  final Utils utils = Utils();
   final KafkaFetchApi _fetchApi = KafkaFetchApi();
   final KafkaJoinGroupApi _joinGroupApi = KafkaJoinGroupApi();
   final KafkaListOffsetApi _listOffsetApi = KafkaListOffsetApi();
@@ -21,14 +25,33 @@ class KafkaConsumer {
       KafkaFindGroupCoordinatorApi();
   final KafkaHeartbeatApi _heartbeatApi = KafkaHeartbeatApi();
   final KafkaSyncGroupApi _syncGroupApi = KafkaSyncGroupApi();
-  final Utils utils = Utils();
 
-  KafkaConsumer({required this.kafka});
+  final Set<String> _topicsToSubscribe = {};
+  final Map<String, List<int>> _memberIdPartitions = {};
+  final Map<String, List<Timer>> _schedules = {};
+  final int rebalanceTimeoutMs;
+  final int sessionTimeoutMs;
+  int _oldTopicsQtd = 0;
+
+  Socket? _brokerGroupLeader;
+  String? _groupInstanceId;
+  String? _memberIdGroupLeader;
+  String? _memberId;
+  int? _generationId;
+
+  bool get _isLeader =>
+      (_memberId != null && _memberIdGroupLeader != null) &&
+      _memberIdGroupLeader == _memberId;
+
+  KafkaConsumer({
+    required this.kafka,
+    required this.rebalanceTimeoutMs,
+    required this.sessionTimeoutMs,
+  });
 
   Future<dynamic> sendFetchRequest({
     int? correlationId,
     int apiVersion = 17,
-    required String clientId,
     int replicaId = -1,
     int maxWaitMs = 30000,
     int minBytes = 1,
@@ -46,7 +69,7 @@ class KafkaConsumer {
         Uint8List message = _fetchApi.serialize(
             correlationId: finalCorrelationId,
             apiVersion: apiVersion,
-            clientId: clientId,
+            clientId: kafka.clientId,
             replicaId: replicaId,
             maxWaitMs: maxWaitMs,
             minBytes: minBytes,
@@ -93,20 +116,8 @@ class KafkaConsumer {
   }) async {
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
-    FindGroupCoordinatorResponse coordinatorResponse =
-        await sendFindGroupCoordinatorRequest(
-            groups: [groupId], async: false, apiVersion: 6);
-
-    if (coordinatorResponse.coordinators == null ||
-        coordinatorResponse.coordinators!.isEmpty) {
-      throw Exception("GroupCoordinator not found for groupId: $groupId");
-    }
-
-    print(coordinatorResponse);
-
-    Coordinator c = coordinatorResponse.coordinators!.first;
-    Socket? broker = kafka.getBrokerByHost(host: c.host, port: c.port);
-
+    print(
+        "JoinRequest -- Topics Length: ${protocols[0].metadata.topics.length}");
     Uint8List message = _joinGroupApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
@@ -146,7 +157,6 @@ class KafkaConsumer {
     int leaderEpoch = -1,
     int limit = 10,
     int replicaId = 0,
-    String? clientId,
     required List<Topic> topics,
   }) async {
     final List<Future<dynamic>> responses = [];
@@ -162,7 +172,7 @@ class KafkaConsumer {
           leaderEpoch: leaderEpoch,
           limit: limit,
           replicaId: replicaId,
-          clientId: clientId,
+          clientId: kafka.clientId,
           topics: topics,
         );
 
@@ -196,7 +206,6 @@ class KafkaConsumer {
     required List<String> groups,
     bool async = true,
     int coordinatorType = COORDINATOR_TYPE_GROUP,
-    String? clientId,
   }) async {
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
@@ -205,10 +214,10 @@ class KafkaConsumer {
       apiVersion: apiVersion,
       coordinatorType: coordinatorType,
       groups: groups,
-      clientId: clientId,
+      clientId: kafka.clientId,
     );
 
-    print("${DateTime.now()} || [APP] FindGroupCoordinatorRequest: $message");
+    // print("${DateTime.now()} || [APP] FindGroupCoordinatorRequest: $message");
     Future<dynamic> res = kafka.enqueueRequest(
         message: message,
         correlationId: finalCorrelationId,
@@ -226,7 +235,6 @@ class KafkaConsumer {
 
   Future<dynamic> sendHeartbeatRequest({
     int? correlationId,
-    String? clientId,
     String? groupInstanceId,
     bool async = true,
     int apiVersion = 4,
@@ -243,7 +251,7 @@ class KafkaConsumer {
       memberId: memberId,
       groupInstanceId: groupInstanceId,
       generationId: generationId,
-      clientId: clientId,
+      clientId: kafka.clientId,
     );
 
     print("${DateTime.now()} || [APP] HeartbeatRequest: $message");
@@ -265,7 +273,6 @@ class KafkaConsumer {
 
   Future<dynamic> sendSyncGroupRequest({
     int? correlationId,
-    String? clientId,
     bool async = true,
     int apiVersion = 5,
     int generationId = -1,
@@ -281,7 +288,7 @@ class KafkaConsumer {
     Uint8List message = _syncGroupApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
-      clientId: clientId,
+      clientId: kafka.clientId,
       generationId: generationId,
       groupId: groupId,
       memberId: memberId,
@@ -291,7 +298,7 @@ class KafkaConsumer {
       assignments: assignment,
     );
 
-    print("${DateTime.now()} || [APP] SyncGroup: $message");
+    // print("${DateTime.now()} || [APP] SyncGroup: $message");
     Future<dynamic> res = kafka.enqueueRequest(
       message: message,
       correlationId: finalCorrelationId,
@@ -308,5 +315,110 @@ class KafkaConsumer {
     return await res;
   }
 
-  Future<dynamic> subscribe() async {}
+  Future<dynamic> subscribe({
+    required List<String> topicsToSubscribe,
+    required String groupId,
+    String? groupInstanceId,
+  }) async {
+    _groupInstanceId = groupInstanceId;
+    _topicsToSubscribe.addAll(topicsToSubscribe);
+
+    if (_oldTopicsQtd == _topicsToSubscribe.length) {
+      print(
+          "Ignorado subscribe! qtd antiga: $_oldTopicsQtd | qtd nova: ${_topicsToSubscribe.length}");
+      return;
+    }
+
+    _oldTopicsQtd = _topicsToSubscribe.length;
+
+    FindGroupCoordinatorResponse cResponse =
+        await sendFindGroupCoordinatorRequest(
+      groups: [groupId],
+      async: false,
+      apiVersion: 6,
+    );
+
+    if (cResponse.coordinators == null || cResponse.coordinators!.isEmpty) {
+      throw Exception("GroupCoordinator not found for groupId: $groupId");
+    }
+
+    Coordinator c = cResponse.coordinators!.first;
+    _brokerGroupLeader = kafka.getBrokerByHost(host: c.host, port: c.port);
+
+    JoinGroupResponse joinRes = await sendJoinGroupRequest(
+      groupId: groupId,
+      sessionTimeoutMs: sessionTimeoutMs,
+      rebalanceTimeoutMs: rebalanceTimeoutMs,
+      memberId: '',
+      protocolType: 'consumer',
+      protocols: Assigner.protocol(topics: _topicsToSubscribe.toList()),
+      groupInstanceId: _groupInstanceId,
+      apiVersion: 9,
+      broker: _brokerGroupLeader,
+      async: false,
+    );
+
+    if (joinRes.errorCode != 0 && joinRes.errorCode != 79) {
+      throw Exception(joinRes.errorMessage);
+    } else if (joinRes.errorCode == 79) {
+      joinRes = await sendJoinGroupRequest(
+        groupId: groupId,
+        sessionTimeoutMs: sessionTimeoutMs,
+        rebalanceTimeoutMs: rebalanceTimeoutMs,
+        memberId: joinRes.memberId,
+        protocolType: 'consumer',
+        protocols: Assigner.protocol(topics: _topicsToSubscribe.toList()),
+        groupInstanceId: groupInstanceId,
+        apiVersion: 9,
+        broker: _brokerGroupLeader,
+        async: false,
+      );
+    }
+
+    if (joinRes.errorCode != 0) {
+      throw Exception(joinRes.errorMessage);
+    }
+
+    _memberIdGroupLeader = joinRes.leader;
+    _memberId = joinRes.memberId;
+    _generationId = joinRes.generationId;
+
+    SyncGroupResponse syncRes = await sendSyncGroupRequest(
+      memberId: _memberId!,
+      groupId: groupId,
+      assignment: Assigner.assign(
+        members: joinRes.members!,
+        isLeader: _isLeader,
+      ),
+      apiVersion: 3,
+      async: false,
+      generationId: _generationId!,
+    );
+
+    print(syncRes);
+  }
+
+  Future<dynamic> unsubscribe({
+    required List<String> topicsToUnsubscribe,
+    required String groupId,
+  }) async {
+    bool hasUpdated = false;
+
+    _topicsToSubscribe.removeWhere(
+      (element) {
+        bool exists = topicsToUnsubscribe.contains(element);
+        if (!hasUpdated && exists) {
+          hasUpdated = true;
+        }
+        return exists;
+      },
+    );
+
+    if (!hasUpdated) return;
+
+    subscribe(
+      topicsToSubscribe: [],
+      groupId: groupId,
+    );
+  }
 }

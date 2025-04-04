@@ -14,18 +14,19 @@ class KafkaJoinGroupApi {
   final Decoder decoder = Decoder();
 
   /// Serialize the JoinGroupRequest to bytes
-  Uint8List serialize(
-      {required int correlationId,
-      required String groupId,
-      required int sessionTimeoutMs,
-      required int rebalanceTimeoutMs,
-      required String memberId,
-      String? groupInstanceId,
-      required String protocolType,
-      required List<Protocol> protocols,
-      String? reason,
-      required int apiVersion,
-      String? clientId}) {
+  Uint8List serialize({
+    required int correlationId,
+    required String groupId,
+    required int sessionTimeoutMs,
+    required int rebalanceTimeoutMs,
+    required String memberId,
+    String? groupInstanceId,
+    required String protocolType,
+    required List<Protocol> protocols,
+    String? reason,
+    required int apiVersion,
+    String? clientId,
+  }) {
     final byteBuffer = BytesBuilder();
 
     if (apiVersion > 5) {
@@ -57,6 +58,7 @@ class KafkaJoinGroupApi {
       byteBuffer.add(encoder.string(protocolType));
     }
 
+    print("Serialize -- Topics Length: ${protocols[0].metadata.topics.length}");
     if (apiVersion > 5) {
       byteBuffer.add(encoder.compactArrayLength(protocols.length));
     } else {
@@ -200,13 +202,31 @@ class KafkaJoinGroupApi {
         offset += groupInstanceId.bytesRead;
       }
 
-      ({int bytesRead, Uint8List value}) metadata;
+      ({int bytesRead, int value}) metadataLen;
       if (apiVersion > 5) {
-        metadata = decoder.readCompactBytes(buffer, offset);
-        offset += metadata.bytesRead;
+        metadataLen = decoder.readCompactArrayLength(buffer, offset);
       } else {
-        metadata = decoder.readBytes(buffer, offset);
-        offset += metadata.bytesRead;
+        final int len = buffer.getInt32(offset);
+        metadataLen = (bytesRead: 4, value: len);
+      }
+      offset += metadataLen.bytesRead;
+
+      MemberMetadata? metadata;
+      if (metadataLen.value > 0) {
+        final int version = buffer.getInt16(offset);
+        offset += 2;
+
+        final int topicsLen = buffer.getInt32(offset);
+        offset += 4;
+
+        List<String> topics = [];
+        for (int j = 0; j < topicsLen; j++) {
+          final topic = decoder.readString(buffer, offset);
+          offset += topic.bytesRead;
+          topics.add(topic.value);
+        }
+
+        metadata = MemberMetadata(version: version, topics: topics);
       }
 
       if (apiVersion > 5) {
@@ -215,9 +235,10 @@ class KafkaJoinGroupApi {
       }
 
       members.add(Member(
-          memberId: memberId.value!,
-          metadata: metadata.value,
-          groupInstanceId: groupInstanceId.value));
+        memberId: memberId.value!,
+        metadata: metadata,
+        groupInstanceId: groupInstanceId.value,
+      ));
     }
 
     if (apiVersion > 5) {

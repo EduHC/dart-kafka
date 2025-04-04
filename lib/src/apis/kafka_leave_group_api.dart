@@ -129,14 +129,15 @@ class KafkaLeaveGroupApi {
       final int errorCode = buffer.getInt16(offset);
       offset += 2;
 
-      members.add(Member(
-        memberId: memberId.value,
-        metadata: [],
-        groupInstanceId: groupInstanceId.value,
-        reason: null,
-        errorCode: errorCode,
-        errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
-      ));
+      members.add(
+        Member(
+          memberId: memberId.value,
+          groupInstanceId: groupInstanceId.value,
+          reason: null,
+          errorCode: errorCode,
+          errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+        ),
+      );
     }
 
     return LeaveGroupResponse(

@@ -20,6 +20,8 @@ export './responses/leave_group_response.dart';
 export './metadata/kafka_partition_metadata.dart';
 export './metadata/kafka_topic_metadata.dart';
 export './metadata/kafka_protocol_metadata.dart';
+export './metadata/assignment_topic_data.dart';
+export './metadata/member_metadata.dart';
 
 // Components Model
 export './components/aborted_transactions.dart';
@@ -34,4 +36,3 @@ export './components/record_header.dart';
 export './components/coordinator.dart';
 export './components/assignment.dart';
 export './components/assignment_sync_group.dart';
-export './components/assignment_topic_data.dart';

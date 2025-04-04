@@ -1,14 +1,16 @@
+import 'package:dart_kafka/dart_kafka.dart';
+
 class Member {
   final String memberId;
   final String? groupInstanceId;
-  final List<int> metadata;
+  final MemberMetadata? metadata;
   final String? reason;
   final int? errorCode;
   final String? errorMessage;
 
   Member({
     required this.memberId,
-    required this.metadata,
+    this.metadata,
     this.groupInstanceId,
     this.reason,
     this.errorCode,
