@@ -10,17 +10,19 @@ import 'package:dart_kafka/src/definitions/message_headers_version.dart';
 import 'package:dart_kafka/src/definitions/types.dart';
 import 'package:dart_kafka/src/interceptors/error_interceptor.dart';
 import 'package:dart_kafka/src/kafka_cluster.dart';
+import 'package:dart_kafka/src/models/request.dart';
 
 class TrafficControler {
   late final StreamController eventController;
 
   final Queue _messageQueue = Queue<List<int>>();
-  final Queue<_Request> _pendingRequestQueue = Queue();
+  final Queue<Request> _pendingRequestQueue = Queue();
 
-  final Map<int, _Request> _processingRequests = {};
+  final Map<int, Request> _processingRequests = {};
   final Map<int, Map<String, dynamic>> _pendingResponses = {};
   final Map<int, Completer<dynamic>> _responseCompleters = {};
   final Queue<_RetryRequest> _retryRequestsQueue = Queue();
+  final Queue<Request> _requestsToCommit = Queue();
 
   final KafkaCluster cluster;
   final KafkaAdmin admin;
@@ -96,7 +98,7 @@ class TrafficControler {
     final int correlationId = byteData.getInt32(offset, Endian.big);
     offset += 4;
 
-    _Request? req = _processingRequests[correlationId];
+    Request? req = _processingRequests[correlationId];
 
     if (req == null) return;
 
@@ -142,11 +144,16 @@ class TrafficControler {
     required int apiKey,
     required int apiVersion,
     required Deserializer function,
-    String? topic,
+    required bool autoCommit,
+    String? topicName,
     int? partition,
     Socket? broker,
+    String? groupId,
+    String? memberId,
+    String? groupInstanceId,
+    Topic? topic,
   }) async {
-    _Request? existing = _pendingRequestQueue.firstWhereOrNull(
+    Request? existing = _pendingRequestQueue.firstWhereOrNull(
       (req) => req.correlationId == correlationId,
     );
 
@@ -164,17 +171,24 @@ class TrafficControler {
     final completer = Completer<T>();
     _responseCompleters[correlationId] = completer;
 
-    _pendingRequestQueue.add(_Request(
-      apiKey: apiKey,
-      apiVersion: apiVersion,
-      function: function,
-      message: message,
-      partition: partition,
-      topic: topic,
-      async: async,
-      correlationId: correlationId,
-      broker: broker,
-    ));
+    _pendingRequestQueue.add(
+      Request(
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        function: function,
+        message: message,
+        partition: partition,
+        topicName: topicName,
+        async: async,
+        correlationId: correlationId,
+        broker: broker,
+        topic: topic,
+        groupId: groupId,
+        memberId: memberId,
+        groupInstanceId: groupInstanceId,
+        autoCommit: autoCommit,
+      ),
+    );
 
     if (_pendingRequestQueue.length == 1) {
       Future.microtask(() => _drainPendingRequestQueue());
@@ -203,7 +217,7 @@ class TrafficControler {
 
   void _enqueueProcessingRequest({
     required int correlationId,
-    required _Request req,
+    required Request req,
   }) {
     if (_processingRequests.containsKey(correlationId)) return;
 
@@ -224,16 +238,22 @@ class TrafficControler {
     required dynamic entity,
     bool hasToRetry = false,
   }) {
-    // print("Entrou p/ completar a request");
     if (!_processingRequests.containsKey(correlationId)) return;
     if (hasToRetry) return;
+
+    if (_processingRequests[correlationId]!.autoCommit) {
+      _requestsToCommit.add(_processingRequests[correlationId]!);
+
+      if (_requestsToCommit.length == 1) {
+        _drainRequestsToCommit();
+      }
+    }
 
     _processingRequests.removeWhere(
       (key, value) => key == correlationId,
     );
 
     if (_responseCompleters.containsKey(correlationId)) {
-      // print("Encontrou um Completer p/ a request");
       _responseCompleters[correlationId]!.complete(entity);
       _responseCompleters.remove(correlationId);
     } else {
@@ -279,7 +299,6 @@ class TrafficControler {
 
   Future<dynamic> _drainRetryRequests() async {
     print("Entrou p/ drenar a fila de Retry");
-    // Future.microtask(() => sleep(Duration(milliseconds: 200)));
     while (_retryRequestsQueue.isNotEmpty) {
       var retryRequest = _retryRequestsQueue.removeFirst();
       _enqueueProcessingRequest(
@@ -290,11 +309,11 @@ class TrafficControler {
     }
   }
 
-  Future<void> sendRequestToBroker({required _Request req}) async {
+  Future<void> sendRequestToBroker({required Request req}) async {
     Socket broker = req.broker ??
         (API_REQUIRE_SPECIFIC_BROKER[req.apiKey]!
             ? cluster.getBrokerForPartition(
-                topic: req.topic!, partition: req.partition!)
+                topic: req.topicName!, partition: req.partition!)
             : cluster.getAnyBroker());
     try {
       // print("**************************************");
@@ -307,36 +326,33 @@ class TrafficControler {
           "Error while sending request! ApiKey: ${req.apiKey} for version ${req.apiVersion}! StackTrace: $stackTrace");
     }
   }
+
+  Future<void> _drainRequestsToCommit() async {
+    while (_requestsToCommit.isNotEmpty) {
+      final Request requestToCommit = _requestsToCommit.removeFirst();
+      kafka.commitMessage(req: requestToCommit);
+    }
+  }
+
+  bool _validadeFetchRequestResult({required FetchResponse res}) {
+    Topic topic = res.topics.first;
+
+    if (topic.partitions == null) {
+      throw Exception("Retrived a FetchRespose without Partitions");
+    }
+
+    Partition part = topic.partitions!.first;
+    if (part.batch == null) return false;
+    if (part.batch!.records == null) return false;
+
+    return true;
+  }
 }
 
 // Helper
-class _Request {
-  final int apiKey;
-  final int apiVersion;
-  final Uint8List message;
-  final Deserializer function;
-  final String? topic;
-  final int? partition;
-  final int correlationId;
-  final bool async;
-  final Socket? broker;
-
-  _Request({
-    required this.message,
-    required this.apiKey,
-    required this.apiVersion,
-    required this.function,
-    this.topic,
-    this.partition,
-    this.broker,
-    required this.async,
-    required this.correlationId,
-  });
-}
-
 class _RetryRequest {
   final int correlationId;
-  final _Request req;
+  final Request req;
 
   _RetryRequest({
     required this.correlationId,

@@ -58,14 +58,15 @@ class KafkaProducer {
 
         // print("${DateTime.now()} || [APP] ProduceRequest: $message");
         Future<dynamic> res = kafka.enqueueRequest(
-            message: message,
-            correlationId: finalCorrelationId,
-            apiKey: PRODUCE,
-            apiVersion: apiVersion,
-            function: produceApi.deserialize,
-            topic: topic.topicName,
-            partition: partition.id,
-            async: async);
+          message: message,
+          correlationId: finalCorrelationId,
+          apiKey: PRODUCE,
+          apiVersion: apiVersion,
+          function: produceApi.deserialize,
+          topicName: topic.topicName,
+          partition: partition.id,
+          async: async,
+        );
 
         responses.add(res);
       }

@@ -83,4 +83,6 @@ const API_REQUIRE_SPECIFIC_BROKER = {
   FIND_COORDINATOR: false,
   HEARTBEAT: false,
   SYNC_GROUP: false,
+  OFFSET_FETCH: false,
+  OFFSET_COMMIT: false,
 };

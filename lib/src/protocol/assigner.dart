@@ -35,7 +35,7 @@ class Assigner {
                   version: member.metadata!.version,
                   topics: member.metadata!.topics.map(
                     (topic) {
-                      return AssignmentTopicData(
+                      return AssignmentTopicMetadata(
                         topicName: topic,
                         partitions: [0],
                       );

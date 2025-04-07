@@ -81,15 +81,14 @@ class KafkaAdmin {
     return res;
   }
 
-  Future<void> updateTopicsMetadata(
-      {int? correlationId,
-      int apiVersion = 9,
-      bool? allowAutoTopicCreation,
-      bool? includeClusterAuthorizedOperations,
-      bool? includeTopicAuthorizedOperations,
-      required List<String> topics,
-      String? clientId,
-      bool async = true}) async {
+  Future<void> updateTopicsMetadata({
+    int? correlationId,
+    int apiVersion = 9,
+    bool? allowAutoTopicCreation,
+    bool? includeClusterAuthorizedOperations,
+    bool? includeTopicAuthorizedOperations,
+    required List<String> topics,
+  }) async {
     MetadataResponse metadata = await sendMetadataRequest(
         topics: topics,
         async: false,

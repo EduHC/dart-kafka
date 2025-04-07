@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dart_kafka/dart_kafka.dart';
 import 'package:dart_kafka/src/kafka_cluster.dart';
+import 'package:dart_kafka/src/models/request.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/traffic_controller.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';
@@ -21,13 +22,12 @@ class KafkaClient {
   late final KafkaAdmin _admin;
   late final KafkaConsumer _consumer;
   late final KafkaProducer _producer;
+  final int rebalanceTimeoutMs;
+  final int sessionTimeoutMs;
 
   Stream get eventStream => _eventController.stream.asBroadcastStream();
   bool get hasPendingProcesses => _trafficControler.hasPendingProcesses;
   List<String> get topicsInUse => _cluster.topicsInUse;
-  KafkaAdmin get admin => _admin;
-  KafkaConsumer get consumer => _consumer;
-  KafkaProducer get producer => _producer;
 
   bool _started = false;
   bool _consumerStarted = false;
@@ -44,14 +44,16 @@ class KafkaClient {
   KafkaClient({
     required List<Broker> brokers,
     this.clientId,
+    required this.rebalanceTimeoutMs,
+    required this.sessionTimeoutMs,
   }) {
     _cluster.setBrokers(brokers);
-    _admin = KafkaAdmin(kafka: this);
     _trafficControler = TrafficControler(
-        cluster: _cluster,
-        eventController: _eventController,
-        kafka: this,
-        admin: admin);
+      cluster: _cluster,
+      eventController: _eventController,
+      kafka: this,
+      admin: getAdminClient(),
+    );
   }
 
   Future<void> connect() async {
@@ -100,10 +102,15 @@ class KafkaClient {
     required int apiKey,
     required int apiVersion,
     required Deserializer function,
-    String? topic,
+    String? topicName,
     int? partition,
     bool async = true,
     Socket? broker,
+    String? groupId,
+    String? memberId,
+    String? groupInstanceId,
+    Topic? topic,
+    bool autoCommit = false,
   }) async {
     Future<dynamic> res = _trafficControler.enqueuePendindRequest(
       message: message,
@@ -111,14 +118,77 @@ class KafkaClient {
       apiKey: apiKey,
       apiVersion: apiVersion,
       function: function,
-      topic: topic,
+      topicName: topicName,
       partition: partition,
       async: async,
       broker: broker,
+      groupId: groupId,
+      memberId: memberId,
+      groupInstanceId: groupInstanceId,
+      topic: topic,
+      autoCommit: autoCommit,
     );
 
     if (async) return;
 
     return res;
+  }
+
+  KafkaConsumer getConsumerClient() {
+    if (isConsumerStarted) return _consumer;
+
+    _consumer = KafkaConsumer(kafka: this);
+
+    _consumerStarted = true;
+    return _consumer;
+  }
+
+  KafkaProducer getProducerClient() {
+    if (isProducerStarted) return _producer;
+
+    _producer = KafkaProducer(kafka: this);
+
+    _producerStarted = true;
+    return _producer;
+  }
+
+  KafkaAdmin getAdminClient() {
+    if (isAdminStarted) return _admin;
+
+    _admin = KafkaAdmin(kafka: this);
+    _adminStarted = true;
+
+    return _admin;
+  }
+
+  Future<dynamic> commitMessage({required Request req}) async {
+    // build up the Topics to commit
+    // TODO: finalizar a implementação do método para Commitar os offsets no automático
+    if (req.topic == null) {
+      throw Exception(
+          "Tryied to commit and request without the Topic information.");
+    }
+    List<OffsetCommitPartition> partitions = [];
+    for (Partition part in req.topic!.partitions ?? []) {
+      partitions.add(
+        OffsetCommitPartition(
+          id: part.id,
+          commitedOffset: part.fetchOffset!,
+          commitedLeaderEpoch: -1,
+        ),
+      );
+    }
+
+    _consumer.sendOffsetCommit(
+      groupId: req.groupId!,
+      memberId: req.memberId!,
+      groupInstanceId: req.groupInstanceId,
+      topics: [
+        OffsetCommitTopic(
+          name: req.topic!.topicName,
+          partitions: partitions,
+        ),
+      ],
+    );
   }
 }

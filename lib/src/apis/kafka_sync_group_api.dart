@@ -81,7 +81,7 @@ class KafkaSyncGroupApi {
           encoder.int32(assignmentSync.assignment!.topics.length),
         );
 
-        for (AssignmentTopicData topic in assignmentSync.assignment!.topics) {
+        for (AssignmentTopicMetadata topic in assignmentSync.assignment!.topics) {
           assignmentBuffer.add(encoder.string(topic.topicName));
           assignmentBuffer.add(encoder.int32(topic.partitions.length));
 
@@ -166,7 +166,7 @@ class KafkaSyncGroupApi {
 
     int? version;
     int? topicsLen;
-    List<AssignmentTopicData> topics = [];
+    List<AssignmentTopicMetadata> topics = [];
     Assignment? assignment;
     if (length.value > 0) {
       version = buffer.getInt16(offset);
@@ -188,7 +188,7 @@ class KafkaSyncGroupApi {
           offset += 4;
         }
 
-        topics.add(AssignmentTopicData(
+        topics.add(AssignmentTopicMetadata(
           topicName: topicName.value,
           partitions: partitions,
         ));

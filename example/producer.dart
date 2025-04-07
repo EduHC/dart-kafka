@@ -6,7 +6,11 @@ void main() async {
     Broker(host: '192.168.200.131', port: 29093),
     Broker(host: '192.168.200.131', port: 29094),
   ];
-  final KafkaClient kafka = KafkaClient(brokers: brokers);
+  final KafkaClient kafka = KafkaClient(
+    brokers: brokers,
+    sessionTimeoutMs: 1800000,
+    rebalanceTimeoutMs: 1500,
+  );
   await kafka.connect();
 
   Future.microtask(
@@ -21,9 +25,7 @@ void main() async {
         'test-topic',
         'notifications',
       ],
-      async: false,
       apiVersion: 9,
-      clientId: 'dart-kafka',
       allowAutoTopicCreation: false,
       includeClusterAuthorizedOperations: false,
       includeTopicAuthorizedOperations: false,

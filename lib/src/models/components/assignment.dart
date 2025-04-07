@@ -2,7 +2,7 @@ import 'package:dart_kafka/dart_kafka.dart';
 
 class Assignment {
   final int version;
-  final List<AssignmentTopicData> topics;
+  final List<AssignmentTopicMetadata> topics;
   final List<int>? userData;
 
   Assignment({

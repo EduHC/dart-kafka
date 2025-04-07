@@ -322,4 +322,8 @@ class Encoder {
     final length = int32(value.length);
     return Uint8List.fromList([...length, ...value]);
   }
+
+  Uint8List boolean(bool value) {
+    return int8(value ? 1 : 0);
+  }
 }

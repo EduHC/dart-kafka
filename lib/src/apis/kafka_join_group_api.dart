@@ -58,7 +58,6 @@ class KafkaJoinGroupApi {
       byteBuffer.add(encoder.string(protocolType));
     }
 
-    print("Serialize -- Topics Length: ${protocols[0].metadata.topics.length}");
     if (apiVersion > 5) {
       byteBuffer.add(encoder.compactArrayLength(protocols.length));
     } else {

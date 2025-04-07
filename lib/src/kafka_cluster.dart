@@ -7,10 +7,7 @@ import 'package:dart_kafka/dart_kafka.dart';
 class KafkaCluster {
   final Set<Broker> _brokers = {};
   // {'testeomnilightvitaverse.location': '192.168.200.31:29092'}
-  final Map<String, Map<int, String>> _topicsBrokers = Map.from({
-    'testeomnilightvitaverse.status': {0: '192.168.200.131:29092'},
-    'testeomnilightvitaverse.sensor': {0: '192.168.200.131:29094'},
-  });
+  final Map<String, Map<int, String>> _topicsBrokers = {};
   // {'192.168.200.31:29092': Socket::class}
   final Map<String, Socket> _sockets = {};
   final Set<StreamSubscription> _subscriptions = {};

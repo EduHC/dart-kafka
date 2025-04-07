@@ -1,14 +1,14 @@
-class AssignmentTopicData {
+class AssignmentTopicMetadata {
   final String topicName;
   final List<int> partitions;
 
-  AssignmentTopicData({
+  AssignmentTopicMetadata({
     required this.topicName,
     required this.partitions,
   });
 
   @override
   String toString() {
-    return "AssignmentTopicData -> topic: $topicName, partitions: $partitions";
+    return "AssignmentTopicMetadata -> topic: $topicName, partitions: $partitions";
   }
 }

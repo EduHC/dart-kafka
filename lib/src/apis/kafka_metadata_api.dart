@@ -15,14 +15,15 @@ class KafkaMetadataApi {
 
   /// Method to serialize to build and serialize the MetadataRequest to Byte Array
   /// Default value of allowAutoTopicCreation is FALSE
-  Uint8List serialize(
-      {required int correlationId,
-      String? clientId,
-      required List<String> topics,
-      required int apiVersion,
-      bool allowAutoTopicCreation = false,
-      bool includeClusterAuthorizedOperations = false,
-      bool includeTopicAuthorizedOperations = false}) {
+  Uint8List serialize({
+    required int correlationId,
+    String? clientId,
+    required List<String> topics,
+    required int apiVersion,
+    bool allowAutoTopicCreation = false,
+    bool includeClusterAuthorizedOperations = false,
+    bool includeTopicAuthorizedOperations = false,
+  }) {
     final byteBuffer = BytesBuilder();
     final Encoder encoder = Encoder();
 
