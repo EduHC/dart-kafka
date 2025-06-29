@@ -72,9 +72,9 @@ class KafkaVersionApi {
       final maxVersion = buffer.getInt16(offset);
       offset += 2;
 
-      int _tagged_field;
+      int taggedField;
       if (apiVersion > 2) {
-        _tagged_field = buffer.getInt8(offset);
+        taggedField = buffer.getInt8(offset);
         offset += 1;
       }
 

@@ -191,7 +191,7 @@ class KafkaProduceApi {
       ));
     }
 
-    var throttleTimeMs;
+    int? throttleTimeMs;
 
     if (utils.canRead(currentOffset: offset, amountOfBytes: 4, data: data)) {
       throttleTimeMs = buffer.getInt32(offset);

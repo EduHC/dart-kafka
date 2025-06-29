@@ -30,7 +30,7 @@ class KafkaConsumer {
   final KafkaOffsetCommitApi _offsetCommitApi = KafkaOffsetCommitApi();
 
   final Set<String> _topicsToSubscribe = {};
-  final Map<String, List<_GroupData>> _memberIdPartitions = {};
+  final Map<String, List<GroupData>> _memberIdPartitions = {};
   final Map<String, Timer> _heartbeatSchedules = {};
   final Map<String, Timer> _fetchSchedules = {};
 
@@ -494,12 +494,12 @@ class KafkaConsumer {
       throw Exception(syncRes.errorMessage);
     }
 
-    List<_GroupData> groupData = syncRes.assignment!.topics.map(
+    List<GroupData> groupData = syncRes.assignment!.topics.map(
       (topic) {
-        return _GroupData(
+        return GroupData(
           topicName: topic.topicName,
           partitions: topic.partitions
-              .map((partition) => _GroupPartitionData(partitionId: partition))
+              .map((partition) => GroupPartitionData(partitionId: partition))
               .toList(),
         );
       },
@@ -591,10 +591,10 @@ class KafkaConsumer {
     _fetchSchedules[key]?.cancel();
 
     List<Topic> topics = [];
-    for (_GroupData groupData in _memberIdPartitions[key] ?? []) {
+    for (GroupData groupData in _memberIdPartitions[key] ?? []) {
       List<Partition> partitions = [];
 
-      for (_GroupPartitionData part in groupData.partitions) {
+      for (GroupPartitionData part in groupData.partitions) {
         partitions.add(
           Partition(
             id: part.partitionId,
@@ -631,7 +631,7 @@ class KafkaConsumer {
   List<RequestGroup> _buildOffsetFetchGroups({
     required String groupId,
     required String memberId,
-    required List<_GroupData> groupData,
+    required List<GroupData> groupData,
   }) {
     List<RequestGroup> result = [];
 
@@ -658,7 +658,7 @@ class KafkaConsumer {
 
   Future<void> sendOffsetFetchAndSync({
     required String groupId,
-    required List<_GroupData> groupData,
+    required List<GroupData> groupData,
   }) async {
     OffsetFetchResponse ofRes = await sendOffsetFetch(
       groups: _buildOffsetFetchGroups(
@@ -682,14 +682,14 @@ class KafkaConsumer {
         throw Exception(group.errorMessage);
       }
 
-      final List<_GroupData> groupData = [];
+      final List<GroupData> groupData = [];
       for (OffsetFetchTopic topic in group.topics) {
         groupData.add(
-          _GroupData(
+          GroupData(
             topicName: topic.name,
             partitions: topic.partitions.map(
               (partition) {
-                return _GroupPartitionData(
+                return GroupPartitionData(
                   partitionId: partition.id,
                   offset: partition.commitedOffset,
                 );
@@ -719,15 +719,18 @@ class KafkaConsumer {
         }
     };
 
-    final List<_GroupData> cachedTopics = _memberIdPartitions[key]!;
+    final List<GroupData> cachedTopics = _memberIdPartitions[key]!;
 
-    final List<_GroupData> updatedTopics = cachedTopics.map((_GroupData groupData) {
+    final List<GroupData> updatedTopics =
+        cachedTopics.map((GroupData groupData) {
       if (topicAndPartitionOffset.containsKey(groupData.topicName)) {
-        final Map<int, int> updatedOffsets = topicAndPartitionOffset[groupData.topicName]!;
+        final Map<int, int> updatedOffsets =
+            topicAndPartitionOffset[groupData.topicName]!;
 
-        final List<_GroupPartitionData> updatedPartitions = groupData.partitions.map((_GroupPartitionData partition) {
+        final List<GroupPartitionData> updatedPartitions =
+            groupData.partitions.map((GroupPartitionData partition) {
           if (updatedOffsets.containsKey(partition.partitionId)) {
-            return _GroupPartitionData(
+            return GroupPartitionData(
               partitionId: partition.partitionId,
               offset: updatedOffsets[partition.partitionId],
             );
@@ -735,7 +738,7 @@ class KafkaConsumer {
           return partition;
         }).toList();
 
-        return _GroupData(
+        return GroupData(
           topicName: groupData.topicName,
           partitions: updatedPartitions,
         );
@@ -747,16 +750,16 @@ class KafkaConsumer {
   }
 }
 
-class _GroupData {
+class GroupData {
   final String topicName;
-  final List<_GroupPartitionData> partitions;
+  final List<GroupPartitionData> partitions;
 
-  _GroupData({required this.topicName, required this.partitions});
+  GroupData({required this.topicName, required this.partitions});
 }
 
-class _GroupPartitionData {
+class GroupPartitionData {
   final int partitionId;
   final int? offset;
 
-  _GroupPartitionData({required this.partitionId, this.offset});
+  GroupPartitionData({required this.partitionId, this.offset});
 }

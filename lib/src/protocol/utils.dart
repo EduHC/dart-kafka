@@ -88,10 +88,6 @@ class Utils {
 
     size += sizeOfVarint(headers.length);
     for (RecordHeader header in headers) {
-      if (header.key == null) {
-        throw Exception("Invalid null header key found in headers");
-      }
-
       int headerKeySize = utf8Length(header.key);
       size += sizeOfVarint(headerKeySize) + headerKeySize;
 
