@@ -58,7 +58,7 @@ class TrafficControler {
       final byteData = ByteData.sublistView(Uint8List.fromList(_buffer));
       int messageLength = byteData.getInt32(0, Endian.big);
 
-      if (_buffer.length < messageLength + 4) {
+      if (_buffer.length < messageLength + 4 || messageLength < 0) {
         // Wait for more data if the complete message is not available
         return;
       }
@@ -94,6 +94,11 @@ class TrafficControler {
     int offset = 0;
     final int messageLength = byteData.getInt32(offset, Endian.big);
     offset += 4;
+
+    if (messageLength < 0 || messageLength > response.length) {
+      print("[KAFKA-TRAFFIC-CONTROLLER] ERROR DECODING MESSAGE LENGTH! $messageLength of ${response.length}");
+      return;
+    }
 
     final int correlationId = byteData.getInt32(offset, Endian.big);
     offset += 4;
@@ -153,6 +158,8 @@ class TrafficControler {
     String? groupInstanceId,
     Topic? topic,
   }) async {
+    // print(
+    //     "${DateTime.now()} || [KAFKA-TRAFFIC-CONTROLLER] Entrou para alocar a request na fila. Topic: $topicName");
     Request? existing = _pendingRequestQueue.firstWhereOrNull(
       (req) => req.correlationId == correlationId,
     );
@@ -205,6 +212,8 @@ class TrafficControler {
   }
 
   Future<void> _drainPendingRequestQueue() async {
+    // print(
+    //     "${DateTime.now()} || [KAFKA-TRAFFIC-CONTROLLER] Entrou para drenar as requests pendentes. Total na fila ${_pendingRequestQueue.length}");
     while (_pendingRequestQueue.isNotEmpty) {
       var pendingRequest = _pendingRequestQueue.removeFirst();
       _enqueueProcessingRequest(
@@ -219,6 +228,8 @@ class TrafficControler {
     required int correlationId,
     required Request req,
   }) {
+    // print(
+    //     "${DateTime.now()} || [KAFKA-TRAFFIC-CONTROLLER] Alocando request como Processing. Topic: ${req.topicName}");
     if (_processingRequests.containsKey(correlationId)) return;
 
     if (_pendingResponses.containsKey(correlationId)) {
@@ -238,11 +249,23 @@ class TrafficControler {
     required dynamic entity,
     bool hasToRetry = false,
   }) {
+    // print(
+    //     "${DateTime.now()} || [KAFKA-TRAFFIC-CONTROLLER] Completando request com resposta do Broker. Topic ${_processingRequests[correlationId]!.topicName}");
     if (!_processingRequests.containsKey(correlationId)) return;
     if (hasToRetry) return;
 
-    if (_processingRequests[correlationId]!.autoCommit) {
-      _requestsToCommit.add(_processingRequests[correlationId]!);
+    final Request req = _processingRequests[correlationId]!;
+
+    if (req.autoCommit &&
+        req is FetchResponse &&
+        _validadeFetchRequestResult(res: entity)) {
+      kafka.getConsumerClient().updateMemberOffsetFromLocal(
+            groupId: req.groupId!,
+            memberId: req.memberId!,
+            topics: (entity as FetchResponse).topics,
+          );
+
+      _requestsToCommit.add(req);
 
       if (_requestsToCommit.length == 1) {
         _drainRequestsToCommit();
@@ -310,6 +333,8 @@ class TrafficControler {
   }
 
   Future<void> sendRequestToBroker({required Request req}) async {
+    // print(
+    //     "${DateTime.now()} || [KAFKA-TRAFFIC-CONTROLLER] Enviando request para o Broker. Topic: ${req.topicName}");
     Socket broker = req.broker ??
         (API_REQUIRE_SPECIFIC_BROKER[req.apiKey]!
             ? cluster.getBrokerForPartition(
@@ -319,7 +344,7 @@ class TrafficControler {
       // print("**************************************");
       // print("Broker: ${broker.address.host}:${broker.remotePort}");
       // print("Message sent: ${req.message}");
-      // print("**************************************");;
+      // print("**************************************");
       broker.add(req.message);
     } catch (e, stackTrace) {
       throw Exception(

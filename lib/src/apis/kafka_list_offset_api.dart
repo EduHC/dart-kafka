@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/models/responses/list_offset_response.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';

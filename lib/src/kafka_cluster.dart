@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:io';
 
 import 'package:dart_kafka/dart_kafka.dart';
@@ -100,7 +99,10 @@ class KafkaCluster {
     return _sockets['$host:$port'];
   }
 
-  void updateTopicsBroker({required MetadataResponse metadata}) {
+  Future<void> updateTopicsBroker({required MetadataResponse metadata}) async {
+    print("[DART-KAFKA] Entrou para atualziar topicos no Broker!");
+    print('[DART-KAFKA] Topics Antes de alterar: $_topicsBrokers');
+    // print('[DART-KAFKA] Recebido: $metadata');
     _topicsBrokers.clear();
     Map? brokers = {
       for (var b in metadata.brokers) b.nodeId: "${b.host}:${b.port}"
@@ -116,6 +118,7 @@ class KafkaCluster {
       }
     }
 
+    print('[DART-KAFKA] Topics Depois de alterar: $_topicsBrokers');
     brokers.clear();
     brokers = null;
   }

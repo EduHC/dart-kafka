@@ -5,6 +5,7 @@ void main() async {
     Broker(host: '192.168.200.131', port: 29092),
     Broker(host: '192.168.200.131', port: 29093),
     Broker(host: '192.168.200.131', port: 29094),
+    // Broker(host: '192.168.10.57', port: 29092),
   ];
   final KafkaClient kafka = KafkaClient(
     brokers: brokers,
@@ -15,21 +16,42 @@ void main() async {
 
   Future.microtask(
     () => kafka.eventStream.listen(
-      (event) => print("Received from Stream: $event"),
+      (event) => print("[ASYNC] Received from Stream: $event"),
     ),
   );
 
-  KafkaAdmin admin = KafkaAdmin(kafka: kafka);
-  await admin.updateTopicsMetadata(
-      topics: [
-        'test-topic',
-        'notifications',
-      ],
-      apiVersion: 9,
-      allowAutoTopicCreation: false,
-      includeClusterAuthorizedOperations: false,
-      includeTopicAuthorizedOperations: false,
-      correlationId: null);
+  final List<String> topicsOmg = [
+    "TESTE_EDUARDO",
+  ];
 
-  admin.sendApiVersionRequest(sock: kafka.getAnyBroker(), apiVersion: 2);
+  final List<String> test = ['test-topic'];
+
+  final List<String> topics = topicsOmg;
+
+  KafkaAdmin admin = KafkaAdmin(kafka: kafka);
+
+  // admin.sendMetadataRequest(
+  //   topics: topics,
+  //   async: true,
+  //   apiVersion: 9,
+  //   clientId: 'dart-kafka',
+  //   allowAutoTopicCreation: false,
+  //   includeClusterAuthorizedOperations: false,
+  //   includeTopicAuthorizedOperations: false,
+  //   correlationId: null,
+  // );
+
+  await admin.updateTopicsMetadata(
+    topics: topics,
+    apiVersion: 9,
+    allowAutoTopicCreation: false,
+    includeClusterAuthorizedOperations: false,
+    includeTopicAuthorizedOperations: false,
+    correlationId: null,
+  );
+
+  // admin.sendApiVersionRequest(sock: kafka.getAnyBroker(), apiVersion: 2);
+
+  kafka.close();
+  return;
 }

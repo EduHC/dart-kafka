@@ -84,8 +84,8 @@ class KafkaClient {
     return _cluster.getBrokerForPartition(topic: topic, partition: partition);
   }
 
-  void updateTopicsBroker({required MetadataResponse metadata}) {
-    _cluster.updateTopicsBroker(metadata: metadata);
+  Future<void> updateTopicsBroker({required MetadataResponse metadata}) async {
+    await _cluster.updateTopicsBroker(metadata: metadata);
   }
 
   Socket getAnyBroker() {

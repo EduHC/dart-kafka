@@ -4,7 +4,6 @@ import 'package:dart_kafka/dart_kafka.dart';
 import 'package:dart_kafka/src/definitions/apis.dart';
 import 'package:dart_kafka/src/definitions/errors.dart';
 import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/models/responses/sync_group_response.dart';
 import 'package:dart_kafka/src/protocol/decoder.dart';
 import 'package:dart_kafka/src/protocol/endocer.dart';
 import 'package:dart_kafka/src/protocol/utils.dart';

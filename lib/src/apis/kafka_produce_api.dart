@@ -18,21 +18,22 @@ class KafkaProduceApi {
   final Decoder decoder = Decoder();
 
   /// Serialize the ProduceRequest
-  Uint8List serialize(
-      {required int correlationId,
-      String? transactionalId,
-      required int acks,
-      required int timeoutMs,
-      required List<Topic> topics,
-      int apiVersion = 11,
-      String? clientId,
-      required int producerId,
-      required int attributes,
-      required int lastOffsetDelta,
-      required int producerEpoch,
-      required int baseSequence,
-      required int batchOffset,
-      required int partitionLeaderEpoch}) {
+  Uint8List serialize({
+    required int correlationId,
+    String? transactionalId,
+    required int acks,
+    required int timeoutMs,
+    required List<Topic> topics,
+    int apiVersion = 11,
+    String? clientId,
+    required int producerId,
+    required int attributes,
+    required int lastOffsetDelta,
+    required int producerEpoch,
+    required int baseSequence,
+    required int batchOffset,
+    required int partitionLeaderEpoch,
+  }) {
     BytesBuilder byteBuffer = BytesBuilder();
 
     if (apiVersion >= 9) {
@@ -72,14 +73,15 @@ class KafkaProduceApi {
 
         byteBuffer.add(encoder.int32(partition.id));
         final Uint8List recordBatch = encoder.writeRecordBatch(
-            records: partition.batch!.records!,
-            producerId: producerId,
-            attributes: attributes,
-            lastOffsetDelta: lastOffsetDelta,
-            producerEpoch: producerEpoch,
-            baseSequence: baseSequence,
-            batchOffset: batchOffset,
-            partitionLeaderEpoch: partitionLeaderEpoch);
+          records: partition.batch!.records!,
+          producerId: producerId,
+          attributes: attributes,
+          lastOffsetDelta: lastOffsetDelta,
+          producerEpoch: producerEpoch,
+          baseSequence: baseSequence,
+          batchOffset: batchOffset,
+          partitionLeaderEpoch: partitionLeaderEpoch,
+        );
 
         // byteBuffer = encoder.writeUnsignedVarint(recordBatch.length + 1); // adding the size of the RecordBatch
         byteBuffer.add(encoder.writeUnsignedVarint(recordBatch.length + 1));
@@ -99,12 +101,13 @@ class KafkaProduceApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          apiKey: apiKey,
-          apiVersion: apiVersion,
-          clientId: clientId,
-          correlationId: correlationId,
-          messageLength: message.length,
-          version: apiVersion > 8 ? 2 : 1),
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        clientId: clientId,
+        correlationId: correlationId,
+        messageLength: message.length,
+        version: apiVersion > 8 ? 2 : 1,
+      ),
       ...message
     ]);
   }
@@ -112,7 +115,7 @@ class KafkaProduceApi {
   /// Deserialize the ProduceResponse
   dynamic deserialize(Uint8List data, int apiVersion) {
     final buffer = ByteData.sublistView(data);
-    int offset = 1; // ignore the tagged_buffer
+    int offset = 0;
 
     // Read responses array
     final result = decoder.readCompactArrayLength(buffer, offset);

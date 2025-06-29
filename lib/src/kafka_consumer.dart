@@ -595,10 +595,12 @@ class KafkaConsumer {
       List<Partition> partitions = [];
 
       for (_GroupPartitionData part in groupData.partitions) {
-        partitions.add(Partition(
-          id: part.partitionId,
-          fetchOffset: (part.offset ?? -1) + 1,
-        ));
+        partitions.add(
+          Partition(
+            id: part.partitionId,
+            fetchOffset: (part.offset ?? -1) + 1,
+          ),
+        );
       }
 
       topics.add(Topic(topicName: groupData.topicName, partitions: partitions));
@@ -680,9 +682,9 @@ class KafkaConsumer {
         throw Exception(group.errorMessage);
       }
 
-      final List<_GroupData> _groupData = [];
+      final List<_GroupData> groupData = [];
       for (OffsetFetchTopic topic in group.topics) {
-        _groupData.add(
+        groupData.add(
           _GroupData(
             topicName: topic.name,
             partitions: topic.partitions.map(
@@ -697,8 +699,51 @@ class KafkaConsumer {
         );
       }
 
-      _memberIdPartitions["$groupId->$_memberId"] = _groupData;
+      _memberIdPartitions["$groupId->$_memberId"] = groupData;
     }
+  }
+
+  void updateMemberOffsetFromLocal({
+    required String groupId,
+    required String memberId,
+    required List<Topic> topics,
+  }) {
+    final String key = "$groupId->$memberId";
+    if (!_memberIdPartitions.containsKey(key)) return;
+
+    final Map<String, Map<int, int>> topicAndPartitionOffset = {
+      for (Topic topic in topics)
+        topic.topicName: {
+          for (Partition part in topic.partitions ?? [])
+            part.id: part.baseOffset ?? 0,
+        }
+    };
+
+    final List<_GroupData> cachedTopics = _memberIdPartitions[key]!;
+
+    final List<_GroupData> updatedTopics = cachedTopics.map((_GroupData groupData) {
+      if (topicAndPartitionOffset.containsKey(groupData.topicName)) {
+        final Map<int, int> updatedOffsets = topicAndPartitionOffset[groupData.topicName]!;
+
+        final List<_GroupPartitionData> updatedPartitions = groupData.partitions.map((_GroupPartitionData partition) {
+          if (updatedOffsets.containsKey(partition.partitionId)) {
+            return _GroupPartitionData(
+              partitionId: partition.partitionId,
+              offset: updatedOffsets[partition.partitionId],
+            );
+          }
+          return partition;
+        }).toList();
+
+        return _GroupData(
+          topicName: groupData.topicName,
+          partitions: updatedPartitions,
+        );
+      }
+      return groupData;
+    }).toList();
+
+    _memberIdPartitions[key] = updatedTopics;
   }
 }
 

@@ -17,22 +17,24 @@ class KafkaProducer {
 
   KafkaProducer({required this.kafka});
 
-  Future<dynamic> produce(
-      {int? correlationId,
-      int apiVersion = 11,
-      int attributes = 0,
-      int baseSequence = 0,
-      int batchOffset = 0,
-      int lastOffsetDelta = 0,
-      int partitionLeaderEpoch = -1,
-      int producerEpoch = 0,
-      int producerId = 0,
-      String? transactionalId,
-      String? clientId,
-      required int acks,
-      required int timeoutMs,
-      required List<Topic> topics,
-      bool async = true}) async {
+  Future<dynamic> produce({
+    int? correlationId,
+    int apiVersion = 11,
+    int attributes = 0,
+    int baseSequence = 0,
+    int batchOffset = 0,
+    int lastOffsetDelta = 0,
+    int partitionLeaderEpoch = -1,
+    int producerEpoch = 0,
+    int producerId = 0,
+    String? transactionalId,
+    String? clientId,
+    required int acks,
+    required int timeoutMs,
+    required List<Topic> topics,
+    bool async = true,
+  }) async {
+    print("${DateTime.now()} || [KAFKA-PRODUCER] Received to produce topic: ${topics[0].topicName}");
     final List<Future<dynamic>> responses = [];
 
     for (Topic topic in topics) {
@@ -56,7 +58,7 @@ class KafkaProducer {
           producerId: producerId,
         );
 
-        // print("${DateTime.now()} || [APP] ProduceRequest: $message");
+        print("${DateTime.now()} || [KAFKA-PRODUCER] Request Serialized and sendind to the TrafficController");
         Future<dynamic> res = kafka.enqueueRequest(
           message: message,
           correlationId: finalCorrelationId,

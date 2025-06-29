@@ -17,64 +17,71 @@ class KafkaAdmin {
     utils = kafka.utils;
   }
 
-  Future<dynamic> sendApiVersionRequest(
-      {String? clientId,
-      int? apiVersion,
-      int? correlationId,
-      bool async = true,
-      Socket? sock}) async {
+  Future<dynamic> sendApiVersionRequest({
+    String? clientId,
+    int? apiVersion,
+    int? correlationId,
+    bool async = true,
+    Socket? sock,
+  }) async {
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = versionApi.serialize(
-        correlationId: finalCorrelationId,
-        clientId: clientId,
-        apiVersion: apiVersion ?? 0);
+      correlationId: finalCorrelationId,
+      clientId: clientId,
+      apiVersion: apiVersion ?? 0,
+    );
 
     // print("${DateTime.now()} || [APP] ApiVersionRequest: $message");
     Future<dynamic> res = kafka.enqueueRequest(
-        message: message,
-        correlationId: finalCorrelationId,
-        apiKey: API_VERSIONS,
-        apiVersion: apiVersion ?? 5,
-        function: versionApi.deserialize,
-        topic: null,
-        partition: null,
-        async: async);
+      message: message,
+      correlationId: finalCorrelationId,
+      apiKey: API_VERSIONS,
+      apiVersion: apiVersion ?? 5,
+      function: versionApi.deserialize,
+      topic: null,
+      partition: null,
+      async: async,
+    );
 
     if (async) return;
 
     return res;
   }
 
-  Future<dynamic> sendMetadataRequest(
-      {int? correlationId,
-      int? apiVersion,
-      bool? allowAutoTopicCreation,
-      bool? includeClusterAuthorizedOperations,
-      bool? includeTopicAuthorizedOperations,
-      required List<String> topics,
-      String? clientId,
-      bool async = true}) async {
+  Future<dynamic> sendMetadataRequest({
+    int? correlationId,
+    int? apiVersion,
+    bool allowAutoTopicCreation = false,
+    bool includeClusterAuthorizedOperations = false,
+    bool includeTopicAuthorizedOperations = false,
+    required List<String> topics,
+    String? clientId,
+    bool async = true,
+  }) async {
     int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
 
     Uint8List message = metadataApi.serialize(
-        correlationId: finalCorrelationId,
-        topics: topics,
-        apiVersion: apiVersion ?? 5,
-        clientId: clientId,
-        allowAutoTopicCreation: true,
-        includeClusterAuthorizedOperations: false,
-        includeTopicAuthorizedOperations: false);
+      correlationId: finalCorrelationId,
+      topics: topics,
+      apiVersion: apiVersion ?? 5,
+      clientId: clientId,
+      allowAutoTopicCreation: allowAutoTopicCreation,
+      includeClusterAuthorizedOperations: includeClusterAuthorizedOperations,
+      includeTopicAuthorizedOperations: includeTopicAuthorizedOperations,
+    );
 
+    // print("${DateTime.now()} || [APP] MetadataRequest: $message");
     Future<dynamic> res = kafka.enqueueRequest(
-        message: message,
-        correlationId: finalCorrelationId,
-        apiKey: METADATA,
-        apiVersion: apiVersion ?? 5,
-        function: metadataApi.deserialize,
-        topic: null,
-        partition: null,
-        async: async);
+      message: message,
+      correlationId: finalCorrelationId,
+      apiKey: METADATA,
+      apiVersion: apiVersion ?? 5,
+      function: metadataApi.deserialize,
+      topic: null,
+      partition: null,
+      async: async,
+    );
 
     if (async) return;
 
@@ -84,21 +91,22 @@ class KafkaAdmin {
   Future<void> updateTopicsMetadata({
     int? correlationId,
     int apiVersion = 9,
-    bool? allowAutoTopicCreation,
-    bool? includeClusterAuthorizedOperations,
-    bool? includeTopicAuthorizedOperations,
+    bool allowAutoTopicCreation = false,
+    bool includeClusterAuthorizedOperations = false,
+    bool includeTopicAuthorizedOperations = false,
     required List<String> topics,
   }) async {
     MetadataResponse metadata = await sendMetadataRequest(
-        topics: topics,
-        async: false,
-        apiVersion: apiVersion,
-        clientId: 'dart-kafka',
-        allowAutoTopicCreation: allowAutoTopicCreation,
-        includeClusterAuthorizedOperations: includeClusterAuthorizedOperations,
-        includeTopicAuthorizedOperations: includeTopicAuthorizedOperations,
-        correlationId: correlationId);
+      topics: topics,
+      async: false,
+      apiVersion: apiVersion,
+      clientId: 'dart-kafka',
+      allowAutoTopicCreation: allowAutoTopicCreation,
+      includeClusterAuthorizedOperations: includeClusterAuthorizedOperations,
+      includeTopicAuthorizedOperations: includeTopicAuthorizedOperations,
+      correlationId: correlationId,
+    );
 
-    kafka.updateTopicsBroker(metadata: metadata);
+    await kafka.updateTopicsBroker(metadata: metadata);
   }
 }

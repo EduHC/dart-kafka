@@ -1,4 +1,3 @@
-import 'package:dart_kafka/dart_kafka.dart';
 import 'package:test/test.dart';
 
 void main() {

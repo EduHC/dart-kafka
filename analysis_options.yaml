@@ -15,6 +15,7 @@ include: package:lints/recommended.yaml
 analyzer:
   errors:
     constant_identifier_names: ignore
+    unused_local_variable: ignore
 
 # Uncomment the following section to specify additional rules.
 
