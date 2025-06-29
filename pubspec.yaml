@@ -1,5 +1,5 @@
 name: dart_kafka
-description: A starting point for Dart libraries or applications.
+description: An Open Source project that implements the Apache Kafka's Protocol to be used in Flutter apps and take the integration to the next level!
 version: 1.0.0
 repository: https://github.com/EduHC/dart-kafka
 
