@@ -23,6 +23,7 @@ class KafkaListOffsetApi {
     required List<Topic> topics,
     required int leaderEpoch,
     required int limit,
+    required DateTime timestamp,
   }) {
     final byteBuffer = BytesBuilder();
 
@@ -43,10 +44,9 @@ class KafkaListOffsetApi {
       for (Partition partition in topic.partitions ?? []) {
         byteBuffer.add(encoder.int32(partition.id));
         if (apiVersion > 3) {
-          // TODO: aqui preciso fazer a request LeaderAndIsr and pass the value
           byteBuffer.add(encoder.int32(leaderEpoch));
         }
-        byteBuffer.add(encoder.int64(DateTime.now().microsecondsSinceEpoch));
+        byteBuffer.add(encoder.int64(timestamp.microsecondsSinceEpoch));
         if (apiVersion == 0) {
           byteBuffer.add(encoder.int32(limit));
         }
@@ -78,7 +78,7 @@ class KafkaListOffsetApi {
   /// Method to deserialize the ListOffsetsResponse
   dynamic deserialize(Uint8List data, int apiVersion) {
     final buffer = ByteData.sublistView(data);
-    int offset = 1; // ignore the tagged_buffer
+    int offset = 0;
 
     final int throttleTimeMs = buffer.getInt32(offset);
     offset += 4;
@@ -137,5 +137,4 @@ class KafkaListOffsetApi {
 
     return ListOffsetResponse(throttleTimeMs: throttleTimeMs, topics: topics);
   }
-
 }
