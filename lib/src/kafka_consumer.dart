@@ -166,6 +166,7 @@ class KafkaConsumer {
     int limit = 10,
     int replicaId = 0,
     required List<Topic> topics,
+    DateTime? timestamp,
   }) async {
     final List<Future<dynamic>> responses = [];
 
@@ -181,7 +182,8 @@ class KafkaConsumer {
           limit: limit,
           replicaId: replicaId,
           clientId: kafka.clientId,
-          topics: topics,
+          topics: [topic],
+          timestamp: timestamp ?? DateTime.utc(1970),
         );
 
         // print("${DateTime.now()} || [APP] ListOffsetRequest: $message");
