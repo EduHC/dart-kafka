@@ -1,15 +1,15 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/src/models/components/produce_response_component.dart';
-import 'package:dart_kafka/src/models/components/record_error.dart';
-import 'package:dart_kafka/src/models/partition.dart';
-import 'package:dart_kafka/src/models/responses/produce_response.dart';
-import 'package:dart_kafka/src/models/topic.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../models/components/produce_response_component.dart';
+import '../models/components/record_error.dart';
+import '../models/partition.dart';
+import '../models/responses/produce_response.dart';
+import '../models/topic.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaProduceApi {
   final int apiKey = PRODUCE; // ProduceRequest API key
@@ -20,12 +20,9 @@ class KafkaProduceApi {
   /// Serialize the ProduceRequest
   Uint8List serialize({
     required int correlationId,
-    String? transactionalId,
     required int acks,
     required int timeoutMs,
     required List<Topic> topics,
-    int apiVersion = 11,
-    String? clientId,
     required int producerId,
     required int attributes,
     required int lastOffsetDelta,
@@ -33,8 +30,11 @@ class KafkaProduceApi {
     required int baseSequence,
     required int batchOffset,
     required int partitionLeaderEpoch,
+    String? transactionalId,
+    int apiVersion = 11,
+    String? clientId,
   }) {
-    BytesBuilder byteBuffer = BytesBuilder();
+    final BytesBuilder byteBuffer = BytesBuilder();
 
     if (apiVersion >= 9) {
       byteBuffer.add(encoder.compactNullableString(transactionalId));
@@ -42,8 +42,9 @@ class KafkaProduceApi {
       byteBuffer.add(encoder.nullableString(transactionalId));
     }
 
-    byteBuffer.add(encoder.int16(acks));
-    byteBuffer.add(encoder.int32(timeoutMs));
+    byteBuffer
+      ..add(encoder.int16(acks))
+      ..add(encoder.int32(timeoutMs));
 
     if (apiVersion >= 9) {
       byteBuffer.add(encoder.compactArrayLength(topics.length));
@@ -53,22 +54,24 @@ class KafkaProduceApi {
 
     for (final topic in topics) {
       if (apiVersion >= 9) {
-        byteBuffer.add(encoder.compactString(topic.topicName));
         byteBuffer
-            .add(encoder.compactArrayLength(topic.partitions?.length ?? 0));
+          ..add(encoder.compactString(topic.topicName))
+          ..add(encoder.compactArrayLength(topic.partitions?.length ?? 0));
       } else {
-        byteBuffer.add(encoder.string(topic.topicName));
-        byteBuffer.add(encoder.int32(topic.partitions?.length ?? 0));
+        byteBuffer
+          ..add(encoder.string(topic.topicName))
+          ..add(encoder.int32(topic.partitions?.length ?? 0));
       }
 
-      for (Partition partition in topic.partitions ?? []) {
+      for (final Partition partition in topic.partitions ?? []) {
         if (partition.batch == null) {
-          throw Exception("The partition ${partition.id} has a null batch.");
+          throw Exception('The partition ${partition.id} has a null batch.');
         }
 
         if (partition.batch!.records == null) {
           throw Exception(
-              "The batch of the partition ${partition.id} has null records");
+            'The batch of the partition ${partition.id} has null records',
+          );
         }
 
         byteBuffer.add(encoder.int32(partition.id));
@@ -84,16 +87,18 @@ class KafkaProduceApi {
         );
 
         // byteBuffer = encoder.writeUnsignedVarint(recordBatch.length + 1); // adding the size of the RecordBatch
-        byteBuffer.add(encoder.writeUnsignedVarint(recordBatch.length + 1));
-        byteBuffer.add(recordBatch);
+        byteBuffer
+          ..add(encoder.writeUnsignedVarint(recordBatch.length + 1))
+          ..add(recordBatch);
       }
     }
 
     if (apiVersion >= 9) {
       // Adding the _tagged_fields
-      byteBuffer.addByte(0);
-      byteBuffer.addByte(0);
-      byteBuffer.addByte(0);
+      byteBuffer
+        ..addByte(0)
+        ..addByte(0)
+        ..addByte(0);
     }
 
     final message = byteBuffer.toBytes();
@@ -108,7 +113,7 @@ class KafkaProduceApi {
         messageLength: message.length,
         version: apiVersion > 8 ? 2 : 1,
       ),
-      ...message
+      ...message,
     ]);
   }
 
@@ -157,8 +162,12 @@ class KafkaProduceApi {
           offset += batchErrorIndex.bytesRead;
           final int taggedFields = buffer.getInt8(offset);
 
-          errorResponses.add(RecordError(
-              batchIndex: batchIndex, errorMessage: batchErrorIndex.value));
+          errorResponses.add(
+            RecordError(
+              batchIndex: batchIndex,
+              errorMessage: batchErrorIndex.value,
+            ),
+          );
         }
 
         final errorMessage = decoder.readCompactNullableString(buffer, offset);
@@ -174,21 +183,24 @@ class KafkaProduceApi {
 
         partitionResponses.add(
           Partition(
-              id: partition,
-              errorCode: errorCode,
-              errorMessage: errorMessage.value ??
-                  (ERROR_MAP[errorCode] as Map)['message'],
-              baseOffset: baseOffset,
-              logAppendTimeMs: logAppendTime,
-              logStartOffset: logStartOffset,
-              recordErrors: errorResponses),
+            id: partition,
+            errorCode: errorCode,
+            errorMessage:
+                errorMessage.value ?? (ERROR_MAP[errorCode]! as Map)['message'],
+            baseOffset: baseOffset,
+            logAppendTimeMs: logAppendTime,
+            logStartOffset: logStartOffset,
+            recordErrors: errorResponses,
+          ),
         );
       }
 
-      responses.add(ProduceResponseComponent(
-        topicName: topicName,
-        partitions: partitionResponses,
-      ));
+      responses.add(
+        ProduceResponseComponent(
+          topicName: topicName,
+          partitions: partitionResponses,
+        ),
+      );
     }
 
     int? throttleTimeMs;

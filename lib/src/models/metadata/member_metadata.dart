@@ -1,14 +1,11 @@
 class MemberMetadata {
-  final int version;
-  final List<String> topics;
-
   MemberMetadata({
     required this.version,
     required this.topics,
   });
+  final int version;
+  final List<String> topics;
 
   @override
-  String toString() {
-    return "MemberMetadata -> version: $version, topics: $topics";
-  }
+  String toString() => 'MemberMetadata -> version: $version, topics: $topics';
 }

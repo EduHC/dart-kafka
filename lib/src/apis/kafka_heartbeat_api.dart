@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../definitions/message_headers_version.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaHeartbeatApi {
   final int apiKey = HEARTBEAT;
@@ -16,13 +16,13 @@ class KafkaHeartbeatApi {
 
   /// Serialize the HeartbeatRequest to bytes
   Uint8List serialize({
-    String? clientId,
-    String? groupInstanceId,
     required int correlationId,
     required int apiVersion,
     required String groupId,
     required int generationId,
     required String memberId,
+    String? clientId,
+    String? groupInstanceId,
   }) {
     BytesBuilder? byteBuffer = BytesBuilder();
 
@@ -58,14 +58,17 @@ class KafkaHeartbeatApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: MessageHeaderVersion.requestHeaderVersion(
-              apiVersion: apiVersion, apiKey: apiKey),
-          messageLength: message.length,
-          apiKey: apiKey,
+        version: MessageHeaderVersion.requestHeaderVersion(
           apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...message
+          apiKey: apiKey,
+        ),
+        messageLength: message.length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...message,
     ]);
   }
 
@@ -80,7 +83,7 @@ class KafkaHeartbeatApi {
       offset += 4;
     }
 
-    int errorCode = buffer.getInt16(offset);
+    final int errorCode = buffer.getInt16(offset);
     offset += 2;
 
     int? taggedField;
@@ -91,7 +94,7 @@ class KafkaHeartbeatApi {
 
     return HeartbeatResponse(
       errorCode: errorCode,
-      errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+      errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
       throttleTimeMs: throttleTimeMs,
     );
   }

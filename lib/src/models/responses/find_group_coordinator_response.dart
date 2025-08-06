@@ -1,6 +1,15 @@
-import 'package:dart_kafka/dart_kafka.dart';
+import '../../../dart_kafka.dart';
 
 class FindGroupCoordinatorResponse {
+  FindGroupCoordinatorResponse({
+    this.throttleTimeMs,
+    this.errorCode,
+    this.errorMessage,
+    this.nodeId,
+    this.host,
+    this.port,
+    this.coordinators,
+  });
   final int? throttleTimeMs;
   final int? errorCode;
   final String? errorMessage;
@@ -9,18 +18,8 @@ class FindGroupCoordinatorResponse {
   final int? port;
   final List<Coordinator>? coordinators;
 
-  FindGroupCoordinatorResponse(
-      {this.throttleTimeMs,
-      this.errorCode,
-      this.errorMessage,
-      this.nodeId,
-      this.host,
-      this.port,
-      this.coordinators});
-
   @override
-  String toString() {
-    return "FindGroupCoordinatorResponse -> throttleTimeMs: $throttleTimeMs, errorCode: $errorCode, errorMessage: $errorMessage, "
-        "nodeId: $nodeId, host: $host, port: $port, coordinators: $coordinators";
-  }
+  String toString() =>
+      'FindGroupCoordinatorResponse -> throttleTimeMs: $throttleTimeMs, errorCode: $errorCode, errorMessage: $errorMessage, '
+      'nodeId: $nodeId, host: $host, port: $port, coordinators: $coordinators';
 }

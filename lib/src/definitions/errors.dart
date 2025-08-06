@@ -131,72 +131,229 @@ const DUPLICATE_VOTER = 126;
 const VOTER_NOT_FOUND = 127;
 
 const ERROR_MAP = {
-  -1: {'message': 'The server experienced an unexpected error when processing the request.', 'retry': false},
+  -1: {
+    'message':
+        'The server experienced an unexpected error when processing the request.',
+    'retry': false,
+  },
   0: {'message': null, 'retry': false},
-  1: {'message': 'The requested offset is not within the range of offsets maintained by the server.', 'retry': false},
-  2: {'message': 'This message has failed its CRC checksum, exceeds the valid size, has a null key for a compacted topic, or is otherwise corrupt.', 'retry': false},
-  3: {'message': 'This server does not host this topic-partition.', 'retry': false},
+  1: {
+    'message':
+        'The requested offset is not within the range of offsets maintained by the server.',
+    'retry': false,
+  },
+  2: {
+    'message':
+        'This message has failed its CRC checksum, exceeds the valid size, has a null key for a compacted topic, or is otherwise corrupt.',
+    'retry': false,
+  },
+  3: {
+    'message': 'This server does not host this topic-partition.',
+    'retry': false,
+  },
   4: {'message': 'The requested fetch size is invalid.', 'retry': false},
-  5: {'message': 'There is no leader for this topic-partition as we are in the middle of a leadership election.', 'retry': true},
-  6: {'message': 'For requests intended only for the leader, this error indicates that the broker is not the current leader. For requests intended for any replica, this error indicates that the broker is not a replica of the topic partition.', 'retry': true},
+  5: {
+    'message':
+        'There is no leader for this topic-partition as we are in the middle of a leadership election.',
+    'retry': true,
+  },
+  6: {
+    'message':
+        'For requests intended only for the leader, this error indicates that the broker is not the current leader. For requests intended for any replica, this error indicates that the broker is not a replica of the topic partition.',
+    'retry': true,
+  },
   7: {'message': 'The request timed out.', 'retry': true},
   8: {'message': 'The broker is not available.', 'retry': true},
-  9: {'message': 'The replica is not available for the requested topic-partition. Produce/Fetch requests and other requests intended only for the leader or follower return NOT_LEADER_OR_FOLLOWER if the broker is not a replica of the topic-partition.', 'retry': true},
-  10: {'message': 'The request included a message larger than the max message size the server will accept.', 'retry': false},
+  9: {
+    'message':
+        'The replica is not available for the requested topic-partition. Produce/Fetch requests and other requests intended only for the leader or follower return NOT_LEADER_OR_FOLLOWER if the broker is not a replica of the topic-partition.',
+    'retry': true,
+  },
+  10: {
+    'message':
+        'The request included a message larger than the max message size the server will accept.',
+    'retry': false,
+  },
   11: {'message': 'The controller moved to another broker.', 'retry': true},
-  12: {'message': 'The metadata field of the offset request was too large.', 'retry': false},
-  13: {'message': 'The server disconnected before a response was received.', 'retry': true},
-  14: {'message': 'The coordinator is loading and hence can\'t process requests.', 'retry': true},
+  12: {
+    'message': 'The metadata field of the offset request was too large.',
+    'retry': false,
+  },
+  13: {
+    'message': 'The server disconnected before a response was received.',
+    'retry': true,
+  },
+  14: {
+    'message': 'The coordinator is loading and hence can\'t process requests.',
+    'retry': true,
+  },
   15: {'message': 'The coordinator is not available.', 'retry': true},
   16: {'message': 'This is not the correct coordinator.', 'retry': true},
-  17: {'message': 'The request attempted to perform an operation on an invalid topic.', 'retry': false},
-  18: {'message': 'The request included message batch larger than the configured segment size on the server.', 'retry': false},
-  19: {'message': 'Messages are rejected since there are fewer in-sync replicas than required.', 'retry': true},
-  20: {'message': 'Messages are written to the log, but to fewer in-sync replicas than required.', 'retry': true},
-  21: {'message': 'Produce request specified an invalid value for required acks.', 'retry': false},
-  22: {'message': 'Specified group generation id is not valid.', 'retry': false},
-  23: {'message': 'The group member\'s supported protocols are incompatible with those of existing members or first group member tried to join with empty protocol type or empty protocol list.', 'retry': false},
+  17: {
+    'message':
+        'The request attempted to perform an operation on an invalid topic.',
+    'retry': false,
+  },
+  18: {
+    'message':
+        'The request included message batch larger than the configured segment size on the server.',
+    'retry': false,
+  },
+  19: {
+    'message':
+        'Messages are rejected since there are fewer in-sync replicas than required.',
+    'retry': true,
+  },
+  20: {
+    'message':
+        'Messages are written to the log, but to fewer in-sync replicas than required.',
+    'retry': true,
+  },
+  21: {
+    'message': 'Produce request specified an invalid value for required acks.',
+    'retry': false,
+  },
+  22: {
+    'message': 'Specified group generation id is not valid.',
+    'retry': false,
+  },
+  23: {
+    'message':
+        'The group member\'s supported protocols are incompatible with those of existing members or first group member tried to join with empty protocol type or empty protocol list.',
+    'retry': false,
+  },
   24: {'message': 'The configured groupId is invalid.', 'retry': false},
-  25: {'message': 'The coordinator is not aware of this member.', 'retry': false},
-  26: {'message': 'The session timeout is not within the range allowed by the broker (as configured by group.min.session.timeout.ms and group.max.session.timeout.ms).', 'retry': false},
-  27: {'message': 'The group is rebalancing, so a rejoin is needed.', 'retry': true},
-  28: {'message': 'The committing offset data size is not valid.', 'retry': false},
+  25: {
+    'message': 'The coordinator is not aware of this member.',
+    'retry': false,
+  },
+  26: {
+    'message':
+        'The session timeout is not within the range allowed by the broker (as configured by group.min.session.timeout.ms and group.max.session.timeout.ms).',
+    'retry': false,
+  },
+  27: {
+    'message': 'The group is rebalancing, so a rejoin is needed.',
+    'retry': true,
+  },
+  28: {
+    'message': 'The committing offset data size is not valid.',
+    'retry': false,
+  },
   29: {'message': 'Topic authorization failed.', 'retry': false},
   30: {'message': 'Group authorization failed.', 'retry': false},
   31: {'message': 'Cluster authorization failed.', 'retry': false},
-  32: {'message': 'The timestamp of the message is out of acceptable range.', 'retry': false},
-  33: {'message': 'The broker does not support the requested SASL mechanism.', 'retry': false},
-  34: {'message': 'Request is not valid given the current SASL state.', 'retry': false},
+  32: {
+    'message': 'The timestamp of the message is out of acceptable range.',
+    'retry': false,
+  },
+  33: {
+    'message': 'The broker does not support the requested SASL mechanism.',
+    'retry': false,
+  },
+  34: {
+    'message': 'Request is not valid given the current SASL state.',
+    'retry': false,
+  },
   35: {'message': 'The version of API is not supported.', 'retry': false},
   36: {'message': 'Topic with this name already exists.', 'retry': false},
   37: {'message': 'Number of partitions is below 1.', 'retry': false},
-  38: {'message': 'Replication factor is below 1 or larger than the number of available brokers.', 'retry': false},
+  38: {
+    'message':
+        'Replication factor is below 1 or larger than the number of available brokers.',
+    'retry': false,
+  },
   39: {'message': 'Replica assignment is invalid.', 'retry': false},
   40: {'message': 'Configuration is invalid.', 'retry': false},
-  41: {'message': 'This is not the correct controller for this cluster.', 'retry': true},
-  42: {'message': 'This most likely occurs because of a request being malformed by the client library or the message was sent to an incompatible broker. See the broker logs for more details.', 'retry': false},
-  43: {'message': 'The message format version on the broker does not support the request.', 'retry': false},
-  44: {'message': 'Request parameters do not satisfy the configured policy.', 'retry': false},
-  45: {'message': 'The broker received an out of order sequence number.', 'retry': false},
-  46: {'message': 'The broker received a duplicate sequence number.', 'retry': false},
-  47: {'message': 'Producer attempted to produce with an old epoch.', 'retry': false},
-  48: {'message': 'The producer attempted a transactional operation in an invalid state.', 'retry': false},
-  49: {'message': 'The producer attempted to use a producer id which is not currently assigned to its transactional id.', 'retry': false},
-  50: {'message': 'The transaction timeout is larger than the maximum value allowed by the broker (as configured by transaction.max.timeout.ms).', 'retry': false},
-  51: {'message': 'The producer attempted to update a transaction while another concurrent operation on the same transaction was ongoing.', 'retry': true},
-  52: {'message': 'Indicates that the transaction coordinator sending a WriteTxnMarker is no longer the current coordinator for a given producer.', 'retry': false},
+  41: {
+    'message': 'This is not the correct controller for this cluster.',
+    'retry': true,
+  },
+  42: {
+    'message':
+        'This most likely occurs because of a request being malformed by the client library or the message was sent to an incompatible broker. See the broker logs for more details.',
+    'retry': false,
+  },
+  43: {
+    'message':
+        'The message format version on the broker does not support the request.',
+    'retry': false,
+  },
+  44: {
+    'message': 'Request parameters do not satisfy the configured policy.',
+    'retry': false,
+  },
+  45: {
+    'message': 'The broker received an out of order sequence number.',
+    'retry': false,
+  },
+  46: {
+    'message': 'The broker received a duplicate sequence number.',
+    'retry': false,
+  },
+  47: {
+    'message': 'Producer attempted to produce with an old epoch.',
+    'retry': false,
+  },
+  48: {
+    'message':
+        'The producer attempted a transactional operation in an invalid state.',
+    'retry': false,
+  },
+  49: {
+    'message':
+        'The producer attempted to use a producer id which is not currently assigned to its transactional id.',
+    'retry': false,
+  },
+  50: {
+    'message':
+        'The transaction timeout is larger than the maximum value allowed by the broker (as configured by transaction.max.timeout.ms).',
+    'retry': false,
+  },
+  51: {
+    'message':
+        'The producer attempted to update a transaction while another concurrent operation on the same transaction was ongoing.',
+    'retry': true,
+  },
+  52: {
+    'message':
+        'Indicates that the transaction coordinator sending a WriteTxnMarker is no longer the current coordinator for a given producer.',
+    'retry': false,
+  },
   53: {'message': 'Transactional Id authorization failed.', 'retry': false},
   54: {'message': 'Security features are disabled.', 'retry': false},
-  55: {'message': 'The broker did not attempt to execute this operation. This may happen for batched RPCs where some operations in the batch failed, causing the broker to respond without trying the rest.', 'retry': false},
-  56: {'message': 'Disk error when trying to access log file on the disk.', 'retry': true},
-  57: {'message': 'The user-specified log directory is not found in the broker config.', 'retry': false},
+  55: {
+    'message':
+        'The broker did not attempt to execute this operation. This may happen for batched RPCs where some operations in the batch failed, causing the broker to respond without trying the rest.',
+    'retry': false,
+  },
+  56: {
+    'message': 'Disk error when trying to access log file on the disk.',
+    'retry': true,
+  },
+  57: {
+    'message':
+        'The user-specified log directory is not found in the broker config.',
+    'retry': false,
+  },
   58: {'message': 'SASL Authentication failed.', 'retry': false},
-  59: {'message': 'This exception is raised by the broker if it could not locate the producer metadata associated with the producerId in question. This could happen if, for instance, the producer\'s records were deleted because their retention time had elapsed. Once the last records of the producerId are removed, the producer\'s metadata is removed from the broker, and future appends by the producer will return this exception.', 'retry': false},
+  59: {
+    'message':
+        'This exception is raised by the broker if it could not locate the producer metadata associated with the producerId in question. This could happen if, for instance, the producer\'s records were deleted because their retention time had elapsed. Once the last records of the producerId are removed, the producer\'s metadata is removed from the broker, and future appends by the producer will return this exception.',
+    'retry': false,
+  },
   60: {'message': 'A partition reassignment is in progress.', 'retry': true},
   61: {'message': 'Delegation Token feature is not enabled.', 'retry': false},
   62: {'message': 'Delegation Token is not found on server.', 'retry': false},
-  63: {'message': 'Specified Principal is not valid Owner/Renewer.', 'retry': false},
-  64: {'message': 'Delegation Token requests are not allowed on PLAINTEXT/1-way SSL channels and on delegation token authenticated channels.', 'retry': false},
+  63: {
+    'message': 'Specified Principal is not valid Owner/Renewer.',
+    'retry': false,
+  },
+  64: {
+    'message':
+        'Delegation Token requests are not allowed on PLAINTEXT/1-way SSL channels and on delegation token authenticated channels.',
+    'retry': false,
+  },
   65: {'message': 'Delegation Token authorization failed.', 'retry': false},
   66: {'message': 'Delegation Token is expired.', 'retry': false},
   67: {'message': 'Supplied principalType is not supported.', 'retry': false},
@@ -204,60 +361,211 @@ const ERROR_MAP = {
   69: {'message': 'The group id does not exist.', 'retry': false},
   70: {'message': 'The fetch session ID was not found.', 'retry': false},
   71: {'message': 'The fetch session epoch is invalid.', 'retry': false},
-  72: {'message': 'There is no listener on the leader broker that matches the listener on which metadata request was processed.', 'retry': false},
+  72: {
+    'message':
+        'There is no listener on the leader broker that matches the listener on which metadata request was processed.',
+    'retry': false,
+  },
   73: {'message': 'Topic deletion is disabled.', 'retry': false},
-  74: {'message': 'The leader epoch in the request is older than the epoch on the broker.', 'retry': false},
-  75: {'message': 'The leader epoch in the request is newer than the epoch on the broker.', 'retry': true},
-  76: {'message': 'The requesting client does not support the compression type of given partition.', 'retry': false},
+  74: {
+    'message':
+        'The leader epoch in the request is older than the epoch on the broker.',
+    'retry': false,
+  },
+  75: {
+    'message':
+        'The leader epoch in the request is newer than the epoch on the broker.',
+    'retry': true,
+  },
+  76: {
+    'message':
+        'The requesting client does not support the compression type of given partition.',
+    'retry': false,
+  },
   77: {'message': 'Broker epoch has changed.', 'retry': true},
-  78: {'message': 'The leader high watermark has not caught up from a recent leader election so the offsets cannot be guaranteed to be monotonically increasing.', 'retry': false},
-  79: {'message': 'The group member needs to have a valid member id before actually entering a consumer group.', 'retry': false},
+  78: {
+    'message':
+        'The leader high watermark has not caught up from a recent leader election so the offsets cannot be guaranteed to be monotonically increasing.',
+    'retry': false,
+  },
+  79: {
+    'message':
+        'The group member needs to have a valid member id before actually entering a consumer group.',
+    'retry': false,
+  },
   80: {'message': 'The preferred leader was not available.', 'retry': true},
-  81: {'message': 'The consumer group has reached its max size.', 'retry': false},
-  82: {'message': 'The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id.', 'retry': false},
-  83: {'message': 'Eligible topic partition leaders are not available.', 'retry': true},
-  84: {'message': 'Leader election not needed for topic partition.', 'retry': false},
+  81: {
+    'message': 'The consumer group has reached its max size.',
+    'retry': false,
+  },
+  82: {
+    'message':
+        'The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id.',
+    'retry': false,
+  },
+  83: {
+    'message': 'Eligible topic partition leaders are not available.',
+    'retry': true,
+  },
+  84: {
+    'message': 'Leader election not needed for topic partition.',
+    'retry': false,
+  },
   85: {'message': 'No partition reassignment is in progress.', 'retry': false},
-  86: {'message': 'Deleting offsets of a topic is forbidden while the consumer group is actively subscribed to it.', 'retry': false},
-  87: {'message': 'This record has failed the validation on broker and hence will be rejected.', 'retry': false},
-  88: {'message': 'There are unstable offsets that need to be cleared.', 'retry': true},
+  86: {
+    'message':
+        'Deleting offsets of a topic is forbidden while the consumer group is actively subscribed to it.',
+    'retry': false,
+  },
+  87: {
+    'message':
+        'This record has failed the validation on broker and hence will be rejected.',
+    'retry': false,
+  },
+  88: {
+    'message': 'There are unstable offsets that need to be cleared.',
+    'retry': true,
+  },
   89: {'message': 'The throttling quota has been exceeded.', 'retry': true},
-  90: {'message': 'There is a newer producer with the same transactionalId which fences the current one.', 'retry': false},
-  91: {'message': 'A request illegally referred to a resource that does not exist.', 'retry': false},
-  92: {'message': 'A request illegally referred to the same resource twice.', 'retry': false},
-  93: {'message': 'Requested credential would not meet criteria for acceptability.', 'retry': false},
-  94: {'message': 'Indicates that the either the sender or recipient of a voter-only request is not one of the expected voters.', 'retry': false},
+  90: {
+    'message':
+        'There is a newer producer with the same transactionalId which fences the current one.',
+    'retry': false,
+  },
+  91: {
+    'message':
+        'A request illegally referred to a resource that does not exist.',
+    'retry': false,
+  },
+  92: {
+    'message': 'A request illegally referred to the same resource twice.',
+    'retry': false,
+  },
+  93: {
+    'message':
+        'Requested credential would not meet criteria for acceptability.',
+    'retry': false,
+  },
+  94: {
+    'message':
+        'Indicates that the either the sender or recipient of a voter-only request is not one of the expected voters.',
+    'retry': false,
+  },
   95: {'message': 'The given update version was invalid.', 'retry': false},
-  96: {'message': 'Unable to update finalized features due to an unexpected server error.', 'retry': false},
-  97: {'message': 'Request principal deserialization failed during forwarding. This indicates an internal error on the broker cluster security setup.', 'retry': false},
+  96: {
+    'message':
+        'Unable to update finalized features due to an unexpected server error.',
+    'retry': false,
+  },
+  97: {
+    'message':
+        'Request principal deserialization failed during forwarding. This indicates an internal error on the broker cluster security setup.',
+    'retry': false,
+  },
   98: {'message': 'Requested snapshot was not found.', 'retry': false},
-  99: {'message': 'Requested position is not greater than or equal to zero, and less than the size of the snapshot.', 'retry': false},
+  99: {
+    'message':
+        'Requested position is not greater than or equal to zero, and less than the size of the snapshot.',
+    'retry': false,
+  },
   100: {'message': 'This server does not host this topic ID.', 'retry': false},
   101: {'message': 'This broker ID is already in use.', 'retry': false},
   102: {'message': 'The given broker ID was not registered.', 'retry': false},
-  103: {'message': 'The log\'s topic ID did not match the topic ID in the request.', 'retry': false},
-  104: {'message': 'The clusterId in the request does not match that found on the server.', 'retry': false},
+  103: {
+    'message': 'The log\'s topic ID did not match the topic ID in the request.',
+    'retry': false,
+  },
+  104: {
+    'message':
+        'The clusterId in the request does not match that found on the server.',
+    'retry': false,
+  },
   105: {'message': 'The transactionalId could not be found.', 'retry': false},
-  106: {'message': 'The fetch session encountered inconsistent topic ID usage.', 'retry': false},
-  107: {'message': 'The new ISR contains at least one ineligible replica.', 'retry': false},
-  108: {'message': 'The AlterPartition request successfully updated the partition state but the leader has changed.', 'retry': true},
-  109: {'message': 'The requested offset is moved to tiered storage.', 'retry': false},
-  110: {'message': 'The member epoch is fenced by the group coordinator. The member must abandon all its partitions and rejoin.', 'retry': false},
-  111: {'message': 'The instance ID is still used by another member in the consumer group. That member must leave first.', 'retry': false},
-  112: {'message': 'The assignor or its version range is not supported by the consumer group.', 'retry': false},
-  113: {'message': 'The member epoch is stale. The member must retry after receiving its updated member epoch via the ConsumerGroupHeartbeat API.', 'retry': false},
-  114: {'message': 'The request was sent to an endpoint of the wrong type.', 'retry': false},
+  106: {
+    'message': 'The fetch session encountered inconsistent topic ID usage.',
+    'retry': false,
+  },
+  107: {
+    'message': 'The new ISR contains at least one ineligible replica.',
+    'retry': false,
+  },
+  108: {
+    'message':
+        'The AlterPartition request successfully updated the partition state but the leader has changed.',
+    'retry': true,
+  },
+  109: {
+    'message': 'The requested offset is moved to tiered storage.',
+    'retry': false,
+  },
+  110: {
+    'message':
+        'The member epoch is fenced by the group coordinator. The member must abandon all its partitions and rejoin.',
+    'retry': false,
+  },
+  111: {
+    'message':
+        'The instance ID is still used by another member in the consumer group. That member must leave first.',
+    'retry': false,
+  },
+  112: {
+    'message':
+        'The assignor or its version range is not supported by the consumer group.',
+    'retry': false,
+  },
+  113: {
+    'message':
+        'The member epoch is stale. The member must retry after receiving its updated member epoch via the ConsumerGroupHeartbeat API.',
+    'retry': false,
+  },
+  114: {
+    'message': 'The request was sent to an endpoint of the wrong type.',
+    'retry': false,
+  },
   115: {'message': 'This endpoint type is not supported yet.', 'retry': false},
   116: {'message': 'This controller ID is not known.', 'retry': false},
-  117: {'message': 'Client sent a push telemetry request with an invalid or outdated subscription ID.', 'retry': false},
-  118: {'message': 'Client sent a push telemetry request larger than the maximum size the broker will accept.', 'retry': false},
-  119: {'message': 'The controller has considered the broker registration to be invalid.', 'retry': false},
-  120: {'message': 'The server encountered an error with the transaction. The client can abort the transaction to continue using this transactional ID.', 'retry': false},
-  121: {'message': 'The record state is invalid. The acknowledgement of delivery could not be completed.', 'retry': false},
+  117: {
+    'message':
+        'Client sent a push telemetry request with an invalid or outdated subscription ID.',
+    'retry': false,
+  },
+  118: {
+    'message':
+        'Client sent a push telemetry request larger than the maximum size the broker will accept.',
+    'retry': false,
+  },
+  119: {
+    'message':
+        'The controller has considered the broker registration to be invalid.',
+    'retry': false,
+  },
+  120: {
+    'message':
+        'The server encountered an error with the transaction. The client can abort the transaction to continue using this transactional ID.',
+    'retry': false,
+  },
+  121: {
+    'message':
+        'The record state is invalid. The acknowledgement of delivery could not be completed.',
+    'retry': false,
+  },
   122: {'message': 'The share session was not found.', 'retry': false},
   123: {'message': 'The share session epoch is invalid.', 'retry': false},
-  124: {'message': 'The share coordinator rejected the request because the share-group state epoch did not match.', 'retry': false},
-  125: {'message': 'The voter key doesn\'t match the receiving replica\'s key.', 'retry': false},
-  126: {'message': 'The voter is already part of the set of voters.', 'retry': false},
-  127: {'message': 'The voter is not part of the set of voters.', 'retry': false},
+  124: {
+    'message':
+        'The share coordinator rejected the request because the share-group state epoch did not match.',
+    'retry': false,
+  },
+  125: {
+    'message': 'The voter key doesn\'t match the receiving replica\'s key.',
+    'retry': false,
+  },
+  126: {
+    'message': 'The voter is already part of the set of voters.',
+    'retry': false,
+  },
+  127: {
+    'message': 'The voter is not part of the set of voters.',
+    'retry': false,
+  },
 };

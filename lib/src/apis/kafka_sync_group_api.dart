@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../definitions/message_headers_version.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaSyncGroupApi {
   final int apiKey = SYNC_GROUP;
@@ -16,16 +16,16 @@ class KafkaSyncGroupApi {
 
   /// Serialize the SyncGroup to bytes
   Uint8List serialize({
-    String? clientId,
-    String? groupInstanceId,
-    String? protocolType,
-    String? protocolName,
     required int correlationId,
     required int apiVersion,
     required String groupId,
     required int generationId,
     required String memberId,
     required List<AssignmentSyncGroup> assignments,
+    String? clientId,
+    String? groupInstanceId,
+    String? protocolType,
+    String? protocolName,
   }) {
     BytesBuilder? byteBuffer = BytesBuilder();
 
@@ -65,7 +65,7 @@ class KafkaSyncGroupApi {
       byteBuffer.add(encoder.int32(assignments.length));
     }
 
-    for (AssignmentSyncGroup assignmentSync in assignments) {
+    for (final AssignmentSyncGroup assignmentSync in assignments) {
       if (apiVersion > 3) {
         byteBuffer.add(encoder.compactString(assignmentSync.memberId));
       } else {
@@ -73,24 +73,27 @@ class KafkaSyncGroupApi {
       }
 
       // here add the assignmentSync.assignment
-      BytesBuilder? assignmentBuffer = BytesBuilder();
+      final BytesBuilder assignmentBuffer = BytesBuilder();
       if (assignmentSync.assignment != null) {
-        assignmentBuffer.add(encoder.int16(assignmentSync.assignment!.version));
-        assignmentBuffer.add(
-          encoder.int32(assignmentSync.assignment!.topics.length),
-        );
+        assignmentBuffer
+          ..add(encoder.int16(assignmentSync.assignment!.version))
+          ..add(
+            encoder.int32(assignmentSync.assignment!.topics.length),
+          );
 
-        for (AssignmentTopicMetadata topic in assignmentSync.assignment!.topics) {
-          assignmentBuffer.add(encoder.string(topic.topicName));
-          assignmentBuffer.add(encoder.int32(topic.partitions.length));
+        for (final AssignmentTopicMetadata topic
+            in assignmentSync.assignment!.topics) {
+          assignmentBuffer
+            ..add(encoder.string(topic.topicName))
+            ..add(encoder.int32(topic.partitions.length));
 
-          for (int partition in topic.partitions) {
+          for (final int partition in topic.partitions) {
             assignmentBuffer.add(encoder.int32(partition));
           }
         }
 
         assignmentBuffer.add(
-          encoder.int32((assignmentSync.assignment!.userData?.length) ?? 0),
+          encoder.int32(assignmentSync.assignment!.userData?.length ?? 0),
         );
       }
 
@@ -118,14 +121,17 @@ class KafkaSyncGroupApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: MessageHeaderVersion.requestHeaderVersion(
-              apiVersion: apiVersion, apiKey: apiKey),
-          messageLength: message.length,
-          apiKey: apiKey,
+        version: MessageHeaderVersion.requestHeaderVersion(
           apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...message
+          apiKey: apiKey,
+        ),
+        messageLength: message.length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...message,
     ]);
   }
 
@@ -165,7 +171,7 @@ class KafkaSyncGroupApi {
 
     int? version;
     int? topicsLen;
-    List<AssignmentTopicMetadata> topics = [];
+    final List<AssignmentTopicMetadata> topics = [];
     Assignment? assignment;
     if (length.value > 0) {
       version = buffer.getInt16(offset);
@@ -187,10 +193,12 @@ class KafkaSyncGroupApi {
           offset += 4;
         }
 
-        topics.add(AssignmentTopicMetadata(
-          topicName: topicName.value,
-          partitions: partitions,
-        ));
+        topics.add(
+          AssignmentTopicMetadata(
+            topicName: topicName.value,
+            partitions: partitions,
+          ),
+        );
       }
 
       assignment = Assignment(
@@ -207,7 +215,7 @@ class KafkaSyncGroupApi {
 
     return SyncGroupResponse(
       errorCode: errorCode,
-      errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+      errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
       assignment: assignment,
       protocolName: protocolName.value,
       protocolType: protocolType.value,

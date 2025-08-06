@@ -2,21 +2,22 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/apis/kafka_fetch_api.dart';
-import 'package:dart_kafka/src/apis/kafka_find_group_coordinator_api.dart';
-import 'package:dart_kafka/src/apis/kafka_heartbeat_api.dart';
-import 'package:dart_kafka/src/apis/kafka_join_group_api.dart';
-import 'package:dart_kafka/src/apis/kafka_list_offset_api.dart';
-import 'package:dart_kafka/src/apis/kafka_offset_commit_api.dart';
-import 'package:dart_kafka/src/apis/kafka_offset_fetch_api.dart';
-import 'package:dart_kafka/src/apis/kafka_sync_group_api.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/definitions/coordinator_types.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
-import 'package:dart_kafka/src/protocol/assigner.dart';
+import '../dart_kafka.dart';
+import 'apis/kafka_fetch_api.dart';
+import 'apis/kafka_find_group_coordinator_api.dart';
+import 'apis/kafka_heartbeat_api.dart';
+import 'apis/kafka_join_group_api.dart';
+import 'apis/kafka_list_offset_api.dart';
+import 'apis/kafka_offset_commit_api.dart';
+import 'apis/kafka_offset_fetch_api.dart';
+import 'apis/kafka_sync_group_api.dart';
+import 'definitions/apis.dart';
+import 'definitions/coordinator_types.dart';
+import 'protocol/assigner.dart';
+import 'protocol/utils.dart';
 
 class KafkaConsumer {
+  KafkaConsumer({required this.kafka});
   final KafkaClient kafka;
   final Utils utils = Utils();
   final KafkaFetchApi _fetchApi = KafkaFetchApi();
@@ -46,9 +47,8 @@ class KafkaConsumer {
       (_memberId != null && _memberIdGroupLeader != null) &&
       _memberIdGroupLeader == _memberId;
 
-  KafkaConsumer({required this.kafka});
-
   Future<dynamic> sendFetchRequest({
+    required List<Topic> topics,
     int? correlationId,
     int apiVersion = 17,
     int replicaId = -1,
@@ -56,7 +56,6 @@ class KafkaConsumer {
     int minBytes = 1,
     int maxBytes = 10000,
     int isolationLevel = 1,
-    required List<Topic> topics,
     bool async = true,
     String? groupId,
     String? memberId,
@@ -65,11 +64,12 @@ class KafkaConsumer {
   }) async {
     final List<Future<dynamic>> responses = [];
 
-    for (Topic topic in topics) {
-      for (Partition partition in topic.partitions ?? []) {
-        int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    for (final Topic topic in topics) {
+      for (final Partition partition in topic.partitions ?? []) {
+        final int finalCorrelationId =
+            correlationId ?? utils.generateCorrelationId();
 
-        Uint8List message = _fetchApi.serialize(
+        final Uint8List message = _fetchApi.serialize(
           correlationId: finalCorrelationId,
           apiVersion: apiVersion,
           clientId: kafka.clientId,
@@ -81,8 +81,8 @@ class KafkaConsumer {
           topics: topics,
         );
 
-        // print("${DateTime.now()} || [APP] FetchRequest: $message");
-        Future<dynamic> res = kafka.enqueueRequest(
+        // debugPrint("${DateTime.now()} || [APP] FetchRequest: $message");
+        final Future<dynamic> res = kafka.enqueueRequest(
           apiKey: FETCH,
           apiVersion: apiVersion,
           correlationId: finalCorrelationId,
@@ -111,22 +111,23 @@ class KafkaConsumer {
   }
 
   Future<dynamic> sendJoinGroupRequest({
-    int? correlationId,
-    int apiVersion = 9,
     required String groupId,
     required int sessionTimeoutMs,
     required int rebalanceTimeoutMs,
     required String memberId,
-    String? groupInstanceId,
     required String protocolType,
     required List<Protocol> protocols,
+    int? correlationId,
+    int apiVersion = 9,
+    String? groupInstanceId,
     String? reason,
     bool async = true,
     Socket? broker,
   }) async {
-    int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    final int finalCorrelationId =
+        correlationId ?? utils.generateCorrelationId();
 
-    Uint8List message = _joinGroupApi.serialize(
+    final Uint8List message = _joinGroupApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
       groupId: groupId,
@@ -139,42 +140,41 @@ class KafkaConsumer {
       reason: reason,
     );
 
-    // print("${DateTime.now()} || [APP] JoinGroupRequest: $message");
-    Future<dynamic> res = kafka.enqueueRequest(
+    // debugPrint("${DateTime.now()} || [APP] JoinGroupRequest: $message");
+    final Future<dynamic> res = kafka.enqueueRequest(
       message: message,
       correlationId: finalCorrelationId,
       apiKey: JOIN_GROUP,
       apiVersion: apiVersion,
       function: _joinGroupApi.deserialize,
-      topic: null,
-      partition: null,
       async: async,
       broker: broker,
     );
 
     if (async) return;
 
-    return await res;
+    return res;
   }
 
   Future<dynamic> sendListOffsetsRequest({
+    required int isolationLevel,
+    required List<Topic> topics,
     int? correlationId,
     int apiVersion = 9,
     bool async = true,
-    required int isolationLevel,
     int leaderEpoch = -1,
     int limit = 10,
     int replicaId = 0,
-    required List<Topic> topics,
     DateTime? timestamp,
   }) async {
     final List<Future<dynamic>> responses = [];
 
-    for (Topic topic in topics) {
-      for (Partition partition in topic.partitions ?? []) {
-        int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    for (final Topic topic in topics) {
+      for (final Partition partition in topic.partitions ?? []) {
+        final int finalCorrelationId =
+            correlationId ?? utils.generateCorrelationId();
 
-        Uint8List message = _listOffsetApi.serialize(
+        final Uint8List message = _listOffsetApi.serialize(
           correlationId: finalCorrelationId,
           apiVersion: apiVersion,
           isolationLevel: isolationLevel,
@@ -186,8 +186,8 @@ class KafkaConsumer {
           timestamp: timestamp ?? DateTime.utc(1970),
         );
 
-        // print("${DateTime.now()} || [APP] ListOffsetRequest: $message");
-        Future<dynamic> res = kafka.enqueueRequest(
+        // debugPrint("${DateTime.now()} || [APP] ListOffsetRequest: $message");
+        final Future<dynamic> res = kafka.enqueueRequest(
           message: message,
           correlationId: finalCorrelationId,
           apiKey: LIST_OFFSETS,
@@ -212,15 +212,16 @@ class KafkaConsumer {
 
   /// @Param groups in ApiVersion < 4 will consider only the FISRT element for the Kafka gets a single Key per request
   Future<dynamic> sendFindGroupCoordinatorRequest({
+    required List<String> groups,
     int? correlationId,
     int apiVersion = 6,
-    required List<String> groups,
     bool async = true,
     int coordinatorType = COORDINATOR_TYPE_GROUP,
   }) async {
-    int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    final int finalCorrelationId =
+        correlationId ?? utils.generateCorrelationId();
 
-    Uint8List message = _coordinatorApi.serialize(
+    final Uint8List message = _coordinatorApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
       coordinatorType: coordinatorType,
@@ -228,35 +229,34 @@ class KafkaConsumer {
       clientId: kafka.clientId,
     );
 
-    // print("${DateTime.now()} || [APP] FindGroupCoordinatorRequest: $message");
-    Future<dynamic> res = kafka.enqueueRequest(
+    // debugPrint("${DateTime.now()} || [APP] FindGroupCoordinatorRequest: $message");
+    final Future<dynamic> res = kafka.enqueueRequest(
       message: message,
       correlationId: finalCorrelationId,
       apiKey: FIND_COORDINATOR,
       apiVersion: apiVersion,
       function: _coordinatorApi.deserialize,
-      topic: null,
-      partition: null,
       async: async,
     );
 
     if (async) return;
 
-    return await res;
+    return res;
   }
 
   Future<dynamic> sendHeartbeatRequest({
+    required String groupId,
+    required String memberId,
     int? correlationId,
     String? groupInstanceId,
     bool async = true,
     int apiVersion = 4,
     int generationId = -1,
-    required String groupId,
-    required String memberId,
   }) async {
-    int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    final int finalCorrelationId =
+        correlationId ?? utils.generateCorrelationId();
 
-    Uint8List message = _heartbeatApi.serialize(
+    final Uint8List message = _heartbeatApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
       groupId: groupId,
@@ -266,24 +266,25 @@ class KafkaConsumer {
       clientId: kafka.clientId,
     );
 
-    // print("${DateTime.now()} || [APP] HeartbeatRequest: $message");
-    Future<dynamic> res = kafka.enqueueRequest(
+    // debugPrint("${DateTime.now()} || [APP] HeartbeatRequest: $message");
+    final Future<dynamic> res = kafka.enqueueRequest(
       message: message,
       correlationId: finalCorrelationId,
       apiKey: HEARTBEAT,
       apiVersion: apiVersion,
       function: _heartbeatApi.deserialize,
-      topic: null,
-      partition: null,
       async: async,
     );
 
     if (async) return;
 
-    return await res;
+    return res;
   }
 
   Future<dynamic> sendSyncGroupRequest({
+    required String memberId,
+    required String groupId,
+    required List<AssignmentSyncGroup> assignment,
     int? correlationId,
     bool async = true,
     int apiVersion = 5,
@@ -292,13 +293,11 @@ class KafkaConsumer {
     String? protocolName,
     String? protocolType,
     Socket? broker,
-    required String memberId,
-    required String groupId,
-    required List<AssignmentSyncGroup> assignment,
   }) async {
-    int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    final int finalCorrelationId =
+        correlationId ?? utils.generateCorrelationId();
 
-    Uint8List message = _syncGroupApi.serialize(
+    final Uint8List message = _syncGroupApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
       clientId: kafka.clientId,
@@ -311,35 +310,34 @@ class KafkaConsumer {
       assignments: assignment,
     );
 
-    // print("${DateTime.now()} || [APP] SyncGroup: $message");
-    Future<dynamic> res = kafka.enqueueRequest(
+    // debugPrint("${DateTime.now()} || [APP] SyncGroup: $message");
+    final Future<dynamic> res = kafka.enqueueRequest(
       message: message,
       correlationId: finalCorrelationId,
       apiKey: SYNC_GROUP,
       apiVersion: apiVersion,
       function: _syncGroupApi.deserialize,
-      topic: null,
-      partition: null,
       async: async,
       broker: broker,
     );
 
     if (async) return;
 
-    return await res;
+    return res;
   }
 
   Future<dynamic> sendOffsetFetch({
+    required List<RequestGroup> groups,
     int? correlationId,
     int apiVersion = 9,
     bool async = true,
     bool requireStable = false,
     Socket? broker,
-    required List<RequestGroup> groups,
   }) async {
-    int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    final int finalCorrelationId =
+        correlationId ?? utils.generateCorrelationId();
 
-    Uint8List message = _offsetFetchApi.serialize(
+    final Uint8List message = _offsetFetchApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
       clientId: kafka.clientId,
@@ -347,37 +345,36 @@ class KafkaConsumer {
       groups: groups,
     );
 
-    // print("${DateTime.now()} || [APP] OffsetFetch: $message");
-    Future<dynamic> res = kafka.enqueueRequest(
+    // debugPrint("${DateTime.now()} || [APP] OffsetFetch: $message");
+    final Future<dynamic> res = kafka.enqueueRequest(
       message: message,
       correlationId: finalCorrelationId,
       apiKey: OFFSET_FETCH,
       apiVersion: apiVersion,
       function: _offsetFetchApi.deserialize,
-      topic: null,
-      partition: null,
       async: async,
       broker: broker,
     );
 
     if (async) return;
 
-    return await res;
+    return res;
   }
 
   Future<dynamic> sendOffsetCommit({
+    required String groupId,
+    required String memberId,
+    required List<OffsetCommitTopic> topics,
     int? correlationId,
     int apiVersion = 9,
     bool async = true,
     String? groupInstanceId,
     int generationIdOrMemberEpoch = -1,
-    required String groupId,
-    required String memberId,
-    required List<OffsetCommitTopic> topics,
   }) async {
-    int finalCorrelationId = correlationId ?? utils.generateCorrelationId();
+    final int finalCorrelationId =
+        correlationId ?? utils.generateCorrelationId();
 
-    Uint8List message = _offsetCommitApi.serialize(
+    final Uint8List message = _offsetCommitApi.serialize(
       correlationId: finalCorrelationId,
       apiVersion: apiVersion,
       clientId: kafka.clientId,
@@ -388,21 +385,19 @@ class KafkaConsumer {
       topics: topics,
     );
 
-    // print("${DateTime.now()} || [APP] OffsetFetch: $message");
-    Future<dynamic> res = kafka.enqueueRequest(
+    // debugPrint("${DateTime.now()} || [APP] OffsetFetch: $message");
+    final Future<dynamic> res = kafka.enqueueRequest(
       message: message,
       correlationId: finalCorrelationId,
       apiKey: OFFSET_COMMIT,
       apiVersion: apiVersion,
       function: _offsetCommitApi.deserialize,
-      topic: null,
-      partition: null,
       async: async,
     );
 
     if (async) return;
 
-    return await res;
+    return res;
   }
 
   Future<dynamic> subscribe({
@@ -414,8 +409,8 @@ class KafkaConsumer {
     _topicsToSubscribe.addAll(topicsToSubscribe);
 
     if (_oldTopicsQtd == _topicsToSubscribe.length) {
-      print("Ignorado subscribe! qtd antiga: $_oldTopicsQtd"
-          " | qtd nova: ${_topicsToSubscribe.length}");
+      print('Ignorado subscribe! qtd antiga: $_oldTopicsQtd'
+          ' | qtd nova: ${_topicsToSubscribe.length}');
       return;
     }
 
@@ -425,18 +420,17 @@ class KafkaConsumer {
 
     _oldTopicsQtd = _topicsToSubscribe.length;
 
-    FindGroupCoordinatorResponse cResponse =
+    final FindGroupCoordinatorResponse cResponse =
         await sendFindGroupCoordinatorRequest(
       groups: [groupId],
       async: false,
-      apiVersion: 6,
     );
 
     if (cResponse.coordinators == null || cResponse.coordinators!.isEmpty) {
-      throw Exception("GroupCoordinator not found for groupId: $groupId");
+      throw Exception('GroupCoordinator not found for groupId: $groupId');
     }
 
-    Coordinator c = cResponse.coordinators!.first;
+    final Coordinator c = cResponse.coordinators!.first;
     _brokerGroupLeader = kafka.getBrokerByHost(host: c.host, port: c.port);
 
     JoinGroupResponse joinRes = await sendJoinGroupRequest(
@@ -447,7 +441,6 @@ class KafkaConsumer {
       protocolType: 'consumer',
       protocols: Assigner.protocol(topics: _topicsToSubscribe.toList()),
       groupInstanceId: _groupInstanceId,
-      apiVersion: 9,
       broker: _brokerGroupLeader,
       async: false,
     );
@@ -463,7 +456,6 @@ class KafkaConsumer {
         protocolType: 'consumer',
         protocols: Assigner.protocol(topics: _topicsToSubscribe.toList()),
         groupInstanceId: groupInstanceId,
-        apiVersion: 9,
         broker: _brokerGroupLeader,
         async: false,
       );
@@ -477,12 +469,12 @@ class KafkaConsumer {
     _memberId ??= joinRes.memberId;
     _generationId = joinRes.generationId;
 
-    List<AssignmentSyncGroup> assignment = Assigner.assign(
+    final List<AssignmentSyncGroup> assignment = Assigner.assign(
       members: joinRes.members!,
       isLeader: _isLeader,
     );
 
-    SyncGroupResponse syncRes = await sendSyncGroupRequest(
+    final SyncGroupResponse syncRes = await sendSyncGroupRequest(
       memberId: _memberId!,
       groupId: groupId,
       assignment: assignment,
@@ -496,16 +488,16 @@ class KafkaConsumer {
       throw Exception(syncRes.errorMessage);
     }
 
-    List<GroupData> groupData = syncRes.assignment!.topics.map(
-      (topic) {
-        return GroupData(
-          topicName: topic.topicName,
-          partitions: topic.partitions
-              .map((partition) => GroupPartitionData(partitionId: partition))
-              .toList(),
-        );
-      },
-    ).toList();
+    final List<GroupData> groupData = syncRes.assignment!.topics
+        .map(
+          (topic) => GroupData(
+            topicName: topic.topicName,
+            partitions: topic.partitions
+                .map((partition) => GroupPartitionData(partitionId: partition))
+                .toList(),
+          ),
+        )
+        .toList();
 
     await sendOffsetFetchAndSync(groupId: groupId, groupData: groupData);
 
@@ -533,7 +525,7 @@ class KafkaConsumer {
 
     _topicsToSubscribe.removeWhere(
       (element) {
-        bool exists = topicsToUnsubscribe.contains(element);
+        final bool exists = topicsToUnsubscribe.contains(element);
         if (!hasUpdated && exists) {
           hasUpdated = true;
         }
@@ -555,7 +547,7 @@ class KafkaConsumer {
     required int generationId,
     String? groupInstanceId,
   }) {
-    final String key = "$groupId->$memberId";
+    final String key = '$groupId->$memberId';
     _heartbeatSchedules[key]?.cancel();
 
     sendHeartbeatRequest(
@@ -570,7 +562,7 @@ class KafkaConsumer {
       // Duration(seconds: 1), (timer) {
       Future.microtask(() async {
         try {
-          // print("[Heartbeat] Sending heartbeat for group: $key");
+          // debugPrint("[Heartbeat] Sending heartbeat for group: $key");
           await sendHeartbeatRequest(
             groupId: groupId,
             memberId: _memberId!,
@@ -589,14 +581,14 @@ class KafkaConsumer {
     required String memberId,
     required String? groupInstanceId,
   }) {
-    final String key = "$groupId->$memberId";
+    final String key = '$groupId->$memberId';
     _fetchSchedules[key]?.cancel();
 
-    List<Topic> topics = [];
-    for (GroupData groupData in _memberIdPartitions[key] ?? []) {
-      List<Partition> partitions = [];
+    final List<Topic> topics = [];
+    for (final GroupData groupData in _memberIdPartitions[key] ?? []) {
+      final List<Partition> partitions = [];
 
-      for (GroupPartitionData part in groupData.partitions) {
+      for (final GroupPartitionData part in groupData.partitions) {
         partitions.add(
           Partition(
             id: part.partitionId,
@@ -609,11 +601,11 @@ class KafkaConsumer {
     }
 
     _fetchSchedules[key] = Timer.periodic(
-      Duration(seconds: 1),
+      const Duration(seconds: 1),
       (timer) {
         Future.microtask(() async {
           try {
-            // print("[FetchRequest] Sending fetch for group: $key");
+            // debugPrint("[FetchRequest] Sending fetch for group: $key");
             await sendFetchRequest(
               apiVersion: 8,
               topics: topics,
@@ -635,16 +627,18 @@ class KafkaConsumer {
     required String memberId,
     required List<GroupData> groupData,
   }) {
-    List<RequestGroup> result = [];
+    final List<RequestGroup> result = [];
 
-    final topics = groupData.map((groupData) {
-      return GroupTopic(
-        name: groupData.topicName,
-        partitions: groupData.partitions.map((partitionData) {
-          return partitionData.partitionId;
-        }).toList(),
-      );
-    }).toList();
+    final topics = groupData
+        .map(
+          (groupData) => GroupTopic(
+            name: groupData.topicName,
+            partitions: groupData.partitions
+                .map((partitionData) => partitionData.partitionId)
+                .toList(),
+          ),
+        )
+        .toList();
 
     result.add(
       RequestGroup(
@@ -662,7 +656,7 @@ class KafkaConsumer {
     required String groupId,
     required List<GroupData> groupData,
   }) async {
-    OffsetFetchResponse ofRes = await sendOffsetFetch(
+    final OffsetFetchResponse ofRes = await sendOffsetFetch(
       groups: _buildOffsetFetchGroups(
         groupId: groupId,
         memberId: _memberId!,
@@ -679,29 +673,29 @@ class KafkaConsumer {
     required OffsetFetchResponse res,
     required String groupId,
   }) {
-    for (ResponseGroup group in res.groups) {
+    for (final ResponseGroup group in res.groups) {
       if (group.errorCode != 0) {
         throw Exception(group.errorMessage);
       }
 
       final List<GroupData> groupData = [];
-      for (OffsetFetchTopic topic in group.topics) {
+      for (final OffsetFetchTopic topic in group.topics) {
         groupData.add(
           GroupData(
             topicName: topic.name,
-            partitions: topic.partitions.map(
-              (partition) {
-                return GroupPartitionData(
-                  partitionId: partition.id,
-                  offset: partition.commitedOffset,
-                );
-              },
-            ).toList(),
+            partitions: topic.partitions
+                .map(
+                  (partition) => GroupPartitionData(
+                    partitionId: partition.id,
+                    offset: partition.commitedOffset,
+                  ),
+                )
+                .toList(),
           ),
         );
       }
 
-      _memberIdPartitions["$groupId->$_memberId"] = groupData;
+      _memberIdPartitions['$groupId->$_memberId'] = groupData;
     }
   }
 
@@ -710,15 +704,15 @@ class KafkaConsumer {
     required String memberId,
     required List<Topic> topics,
   }) {
-    final String key = "$groupId->$memberId";
+    final String key = '$groupId->$memberId';
     if (!_memberIdPartitions.containsKey(key)) return;
 
     final Map<String, Map<int, int>> topicAndPartitionOffset = {
-      for (Topic topic in topics)
+      for (final Topic topic in topics)
         topic.topicName: {
-          for (Partition part in topic.partitions ?? [])
+          for (final Partition part in topic.partitions ?? [])
             part.id: part.baseOffset ?? 0,
-        }
+        },
     };
 
     final List<GroupData> cachedTopics = _memberIdPartitions[key]!;
@@ -753,15 +747,13 @@ class KafkaConsumer {
 }
 
 class GroupData {
+  GroupData({required this.topicName, required this.partitions});
   final String topicName;
   final List<GroupPartitionData> partitions;
-
-  GroupData({required this.topicName, required this.partitions});
 }
 
 class GroupPartitionData {
+  GroupPartitionData({required this.partitionId, this.offset});
   final int partitionId;
   final int? offset;
-
-  GroupPartitionData({required this.partitionId, this.offset});
 }

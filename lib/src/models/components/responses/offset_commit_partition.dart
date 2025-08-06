@@ -1,16 +1,14 @@
 class ResOffsetCommitPartition {
-  final int id;
-  final int errorCode;
-  final String? errorMessage;
-
   ResOffsetCommitPartition({
     required this.id,
     required this.errorCode,
     this.errorMessage,
   });
+  final int id;
+  final int errorCode;
+  final String? errorMessage;
 
   @override
-  String toString() {
-    return "ResOffsetCommitPartition -> id: $id, errorCode: $errorCode, errorMessage: $errorMessage";
-  }
+  String toString() =>
+      'ResOffsetCommitPartition -> id: $id, errorCode: $errorCode, errorMessage: $errorMessage';
 }

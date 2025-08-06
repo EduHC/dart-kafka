@@ -1,11 +1,12 @@
 import 'dart:typed_data';
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../definitions/message_headers_version.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaJoinGroupApi {
   final int apiKey = JOIN_GROUP;
@@ -20,11 +21,11 @@ class KafkaJoinGroupApi {
     required int sessionTimeoutMs,
     required int rebalanceTimeoutMs,
     required String memberId,
-    String? groupInstanceId,
     required String protocolType,
     required List<Protocol> protocols,
-    String? reason,
     required int apiVersion,
+    String? groupInstanceId,
+    String? reason,
     String? clientId,
   }) {
     final byteBuffer = BytesBuilder();
@@ -35,8 +36,9 @@ class KafkaJoinGroupApi {
       byteBuffer.add(encoder.string(groupId));
     }
 
-    byteBuffer.add(encoder.int32(sessionTimeoutMs));
-    byteBuffer.add(encoder.int32(rebalanceTimeoutMs));
+    byteBuffer
+      ..add(encoder.int32(sessionTimeoutMs))
+      ..add(encoder.int32(rebalanceTimeoutMs));
 
     if (apiVersion > 5) {
       byteBuffer.add(encoder.compactString(memberId));
@@ -71,8 +73,8 @@ class KafkaJoinGroupApi {
         byteBuffer.add(encoder.string(protocol.name));
       }
 
-      BytesBuilder? metadata = BytesBuilder();
-      metadata.add(encoder.int16(protocol.metadata.version));
+      final BytesBuilder metadata = BytesBuilder()
+        ..add(encoder.int16(protocol.metadata.version));
 
       final topics = protocol.metadata.topics;
       metadata.add(encoder.int32(topics.length));
@@ -105,14 +107,17 @@ class KafkaJoinGroupApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: MessageHeaderVersion.requestHeaderVersion(
-              apiVersion: apiVersion, apiKey: apiKey),
-          messageLength: byteBuffer.toBytes().length,
-          apiKey: apiKey,
+        version: MessageHeaderVersion.requestHeaderVersion(
           apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...byteBuffer.toBytes()
+          apiKey: apiKey,
+        ),
+        messageLength: byteBuffer.toBytes().length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...byteBuffer.toBytes(),
     ]);
   }
 
@@ -218,7 +223,7 @@ class KafkaJoinGroupApi {
         final int topicsLen = buffer.getInt32(offset);
         offset += 4;
 
-        List<String> topics = [];
+        final List<String> topics = [];
         for (int j = 0; j < topicsLen; j++) {
           final topic = decoder.readString(buffer, offset);
           offset += topic.bytesRead;
@@ -233,11 +238,13 @@ class KafkaJoinGroupApi {
         offset += 1;
       }
 
-      members.add(Member(
-        memberId: memberId.value!,
-        metadata: metadata,
-        groupInstanceId: groupInstanceId.value,
-      ));
+      members.add(
+        Member(
+          memberId: memberId.value!,
+          metadata: metadata,
+          groupInstanceId: groupInstanceId.value,
+        ),
+      );
     }
 
     if (apiVersion > 5) {
@@ -248,7 +255,7 @@ class KafkaJoinGroupApi {
     return JoinGroupResponse(
       throttleTimeMs: throttleTimeMs,
       errorCode: errorCode,
-      errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+      errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
       generationId: generationId,
       leader: leader.value!,
       memberId: memberId.value!,

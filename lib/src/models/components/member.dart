@@ -1,13 +1,6 @@
-import 'package:dart_kafka/dart_kafka.dart';
+import '../../../dart_kafka.dart';
 
 class Member {
-  final String memberId;
-  final String? groupInstanceId;
-  final MemberMetadata? metadata;
-  final String? reason;
-  final int? errorCode;
-  final String? errorMessage;
-
   Member({
     required this.memberId,
     this.metadata,
@@ -16,9 +9,14 @@ class Member {
     this.errorCode,
     this.errorMessage,
   });
+  final String memberId;
+  final String? groupInstanceId;
+  final MemberMetadata? metadata;
+  final String? reason;
+  final int? errorCode;
+  final String? errorMessage;
 
   @override
-  String toString() {
-    return "Member -> id: $memberId, groupInstanceId: $groupInstanceId, metadata: $metadata, reason: $reason, errorCode: $errorCode, errorMessage: $errorMessage";
-  }
+  String toString() =>
+      'Member -> id: $memberId, groupInstanceId: $groupInstanceId, metadata: $metadata, reason: $reason, errorCode: $errorCode, errorMessage: $errorMessage';
 }

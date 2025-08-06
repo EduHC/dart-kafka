@@ -1,6 +1,14 @@
-import 'package:dart_kafka/dart_kafka.dart';
+import '../../../dart_kafka.dart';
 
 class SyncGroupResponse {
+  SyncGroupResponse({
+    required this.errorCode,
+    required this.assignment,
+    this.throttleTimeMs,
+    this.errorMessage,
+    this.protocolType,
+    this.protocolName,
+  });
   final int? throttleTimeMs;
   final int errorCode;
   final String? errorMessage;
@@ -8,18 +16,8 @@ class SyncGroupResponse {
   final String? protocolName;
   final Assignment? assignment;
 
-  SyncGroupResponse({
-    this.throttleTimeMs,
-    required this.errorCode,
-    this.errorMessage,
-    this.protocolType,
-    this.protocolName,
-    required this.assignment,
-  });
-
   @override
-  String toString() {
-    return "SyncGroupResponse -> throttleTimeMs: $throttleTimeMs, errorCode: $errorCode, errorMessage: $errorMessage, "
-        "protocolType: $protocolType, protocolName: $protocolName, assignment: $assignment";
-  }
+  String toString() =>
+      'SyncGroupResponse -> throttleTimeMs: $throttleTimeMs, errorCode: $errorCode, errorMessage: $errorMessage, '
+      'protocolType: $protocolType, protocolName: $protocolName, assignment: $assignment';
 }

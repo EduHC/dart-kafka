@@ -1,13 +1,11 @@
-import 'package:dart_kafka/src/models/topic.dart';
+import '../topic.dart';
 
 class DescribeProducerResponse {
+  DescribeProducerResponse({required this.throttleTime, required this.topics});
   final int throttleTime;
   final List<Topic> topics;
 
-  DescribeProducerResponse({required this.throttleTime, required this.topics});
-
   @override
-  String toString() {
-    return "DescribeProducerResponse -> throttleTime: $throttleTime, topics: $topics";
-  }
+  String toString() =>
+      'DescribeProducerResponse -> throttleTime: $throttleTime, topics: $topics';
 }

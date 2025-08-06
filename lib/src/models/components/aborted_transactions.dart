@@ -8,23 +8,19 @@ class AbortedTransaction {
   AbortedTransaction({required this.producerId, required this.firstOffset});
 
   @override
-  String toString() {
-    return "AbortedTransaction -> producerId: $producerId, firstOffset: $firstOffset";
-  }
+  String toString() =>
+      'AbortedTransaction -> producerId: $producerId, firstOffset: $firstOffset';
 
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'producerId': producerId,
-      'firstOffset': firstOffset,
-    };
-  }
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'producerId': producerId,
+        'firstOffset': firstOffset,
+      };
 
-  factory AbortedTransaction.fromMap(Map<String, dynamic> map) {
-    return AbortedTransaction(
-      producerId: map['producerId'] as int,
-      firstOffset: map['firstOffset'] as int,
-    );
-  }
+  factory AbortedTransaction.fromMap(Map<String, dynamic> map) =>
+      AbortedTransaction(
+        producerId: map['producerId'] as int,
+        firstOffset: map['firstOffset'] as int,
+      );
 
   String toJson() => json.encode(toMap());
 

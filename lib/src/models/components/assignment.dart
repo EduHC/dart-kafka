@@ -1,18 +1,16 @@
-import 'package:dart_kafka/dart_kafka.dart';
+import '../../../dart_kafka.dart';
 
 class Assignment {
-  final int version;
-  final List<AssignmentTopicMetadata> topics;
-  final List<int>? userData;
-
   Assignment({
     required this.version,
     required this.topics,
     this.userData,
   });
+  final int version;
+  final List<AssignmentTopicMetadata> topics;
+  final List<int>? userData;
 
   @override
-  String toString() {
-    return "Assignment -> version: $version, topics: $topics, userData: $userData";
-  }
+  String toString() =>
+      'Assignment -> version: $version, topics: $topics, userData: $userData';
 }

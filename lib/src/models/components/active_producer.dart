@@ -19,33 +19,28 @@ class ActiveProducer {
   });
 
   @override
-  String toString() {
-    return "ActiveProducer -> id: $id, epoch: $epoch, lastSequence: $lastSequence, "
-        "lastTimestamp: $lastTimestamp, coordinatorEpoch: $coordinatorEpoch, "
-        "currentTxnStartOffset: $currentTxnStartOffset";
-  }
+  String toString() =>
+      'ActiveProducer -> id: $id, epoch: $epoch, lastSequence: $lastSequence, '
+      'lastTimestamp: $lastTimestamp, coordinatorEpoch: $coordinatorEpoch, '
+      'currentTxnStartOffset: $currentTxnStartOffset';
 
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'id': id,
-      'epoch': epoch,
-      'lastSequence': lastSequence,
-      'lastTimestamp': lastTimestamp,
-      'coordinatorEpoch': coordinatorEpoch,
-      'currentTxnStartOffset': currentTxnStartOffset,
-    };
-  }
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'id': id,
+        'epoch': epoch,
+        'lastSequence': lastSequence,
+        'lastTimestamp': lastTimestamp,
+        'coordinatorEpoch': coordinatorEpoch,
+        'currentTxnStartOffset': currentTxnStartOffset,
+      };
 
-  factory ActiveProducer.fromMap(Map<String, dynamic> map) {
-    return ActiveProducer(
-      id: map['id'] as int,
-      epoch: map['epoch'] as int,
-      lastSequence: map['lastSequence'] as int,
-      lastTimestamp: map['lastTimestamp'] as int,
-      coordinatorEpoch: map['coordinatorEpoch'] as int,
-      currentTxnStartOffset: map['currentTxnStartOffset'] as int,
-    );
-  }
+  factory ActiveProducer.fromMap(Map<String, dynamic> map) => ActiveProducer(
+        id: map['id'] as int,
+        epoch: map['epoch'] as int,
+        lastSequence: map['lastSequence'] as int,
+        lastTimestamp: map['lastTimestamp'] as int,
+        coordinatorEpoch: map['coordinatorEpoch'] as int,
+        currentTxnStartOffset: map['currentTxnStartOffset'] as int,
+      );
 
   String toJson() => json.encode(toMap());
 

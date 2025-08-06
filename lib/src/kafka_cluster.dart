@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dart_kafka/dart_kafka.dart';
+import '../dart_kafka.dart';
 
 class KafkaCluster {
   final Set<Broker> _brokers = {};
@@ -14,20 +14,20 @@ class KafkaCluster {
   List<String> get topicsInUse => _topicsBrokers.keys.toList();
 
   Future<void> connect({required Function responseHandler}) async {
-    for (Broker broker in _brokers) {
+    for (final Broker broker in _brokers) {
       try {
-        String key = "${broker.host}:${broker.port}";
+        final String key = '${broker.host}:${broker.port}';
 
         if (_sockets.containsKey(key)) continue;
-        Socket sock = await Socket.connect(broker.host, broker.port);
+        final Socket sock = await Socket.connect(broker.host, broker.port);
         _sockets.addAll({key: sock});
       } catch (e) {
-        throw Exception("Error trying to connect to informed host: $e");
+        throw Exception('Error trying to connect to informed host: $e');
       }
     }
 
-    for (Socket sock in _sockets.values) {
-      StreamSubscription subscription = sock.listen(
+    for (final Socket sock in _sockets.values) {
+      final StreamSubscription subscription = sock.listen(
         (event) => responseHandler(event),
       );
       _subscriptions.add(subscription);
@@ -52,13 +52,14 @@ class KafkaCluster {
   }
 
   void setBrokers(List<Broker> brokers) {
-    _brokers.clear();
-    _brokers.addAll(brokers);
+    _brokers
+      ..clear()
+      ..addAll(brokers);
   }
 
-  Future<void> closeBroker({required brokerId}) async {
+  Future<void> closeBroker({required String brokerId}) async {
     if (!_sockets.containsKey(brokerId)) {
-      throw Exception("Requested Broker not found!");
+      throw Exception('Requested Broker not found!');
     }
 
     await _sockets[brokerId]!.close();
@@ -70,19 +71,21 @@ class KafkaCluster {
     required int partition,
   }) {
     if (!_topicsBrokers.containsKey(topic)) {
-      throw Exception("Topic not found in the Cluster! $topic");
+      throw Exception('Topic not found in the Cluster! $topic');
     }
 
-    String? brokerRoute = (_topicsBrokers[topic] as Map)[partition];
+    final String? brokerRoute = (_topicsBrokers[topic]! as Map)[partition];
 
     if (brokerRoute == null || brokerRoute.isEmpty) {
       throw Exception(
-          "Not found Broker Host and Port for topic $topic and partition $partition");
+        'Not found Broker Host and Port for topic $topic and partition $partition',
+      );
     }
 
     if (!_sockets.containsKey(brokerRoute)) {
       throw Exception(
-          "Socket ${_topicsBrokers[topic]} not found for the topic $topic");
+        'Socket ${_topicsBrokers[topic]} not found for the topic $topic',
+      );
     }
 
     return _sockets[brokerRoute]!;
@@ -90,30 +93,29 @@ class KafkaCluster {
 
   Socket getAnyBroker() {
     if (_sockets.isEmpty) {
-      throw Exception("No Brokers available!");
+      throw Exception('No Brokers available!');
     }
     return _sockets.values.first;
   }
 
-  Socket? getBrokerByHost({required String host, required int port}) {
-    return _sockets['$host:$port'];
-  }
+  Socket? getBrokerByHost({required String host, required int port}) =>
+      _sockets['$host:$port'];
 
   Future<void> updateTopicsBroker({required MetadataResponse metadata}) async {
-    print("[DART-KAFKA] Entrou para atualziar topicos no Broker!");
+    print('[DART-KAFKA] Entrou para atualziar topicos no Broker!');
     print('[DART-KAFKA] Topics Antes de alterar: $_topicsBrokers');
     // print('[DART-KAFKA] Recebido: $metadata');
     _topicsBrokers.clear();
     Map? brokers = {
-      for (var b in metadata.brokers) b.nodeId: "${b.host}:${b.port}"
+      for (final b in metadata.brokers) b.nodeId: '${b.host}:${b.port}',
     };
 
-    for (KafkaTopicMetadata topic in metadata.topics) {
-      for (KafkaPartitionMetadata partition in topic.partitions) {
+    for (final KafkaTopicMetadata topic in metadata.topics) {
+      for (final KafkaPartitionMetadata partition in topic.partitions) {
         _topicsBrokers.addAll({
           topic.topicName: {
-            partition.partitionId: "${brokers[partition.leaderId]}"
-          }
+            partition.partitionId: '${brokers[partition.leaderId]}',
+          },
         });
       }
     }

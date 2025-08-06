@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaMetadataApi {
   final int apiKey = METADATA;
@@ -13,13 +13,13 @@ class KafkaMetadataApi {
   final Encoder encoder = Encoder();
   final Decoder decoder = Decoder();
 
-  /// Method to serialize to build and serialize the MetadataRequest to Byte Array
+  /// Method to serialize to serialize the MetadataRequest to Byte Array
   /// Default value of allowAutoTopicCreation is FALSE
   Uint8List serialize({
     required int correlationId,
-    String? clientId,
     required List<String> topics,
     required int apiVersion,
+    String? clientId,
     bool allowAutoTopicCreation = false,
     bool includeClusterAuthorizedOperations = false,
     bool includeTopicAuthorizedOperations = false,
@@ -33,7 +33,7 @@ class KafkaMetadataApi {
       byteBuffer.add(encoder.int32(topics.length));
     }
 
-    for (var topic in topics) {
+    for (final topic in topics) {
       if (apiVersion >= 10) {
         // topicId
         byteBuffer.add([
@@ -56,8 +56,9 @@ class KafkaMetadataApi {
         ]);
       }
       if (apiVersion >= 9) {
-        byteBuffer.add(encoder.compactNullableString(topic));
-        byteBuffer.add(encoder.int8(0)); // _tagged_fields
+        byteBuffer
+          ..add(encoder.compactNullableString(topic))
+          ..add(encoder.int8(0)); // _tagged_fields
       } else {
         byteBuffer.add(encoder.string(topic));
       }
@@ -80,16 +81,17 @@ class KafkaMetadataApi {
       byteBuffer.add(encoder.int8(0));
     }
 
-    Uint8List message = byteBuffer.toBytes();
+    final Uint8List message = byteBuffer.toBytes();
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: apiVersion >= 9 ? 2 : 1,
-          messageLength: message.length,
-          apiKey: apiKey,
-          apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...message
+        version: apiVersion >= 9 ? 2 : 1,
+        messageLength: message.length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...message,
     ]);
   }
 
@@ -104,7 +106,7 @@ class KafkaMetadataApi {
     final brokersLength = decoder.readCompactArrayLength(buffer, offset);
     offset += brokersLength.bytesRead;
 
-    List<Broker> brokers = [];
+    final List<Broker> brokers = [];
     for (int i = 0; i < brokersLength.value; i++) {
       final int nodeId = buffer.getInt32(offset);
       offset += 4;
@@ -121,8 +123,14 @@ class KafkaMetadataApi {
       final int bTaggedField = buffer.getInt8(offset);
       offset += 1;
 
-      brokers.add(Broker(
-          nodeId: nodeId, host: host.value, port: port, rack: rack.value));
+      brokers.add(
+        Broker(
+          nodeId: nodeId,
+          host: host.value,
+          port: port,
+          rack: rack.value,
+        ),
+      );
     }
 
     final clusterId = decoder.readCompactNullableString(buffer, offset);
@@ -134,7 +142,7 @@ class KafkaMetadataApi {
     final topicsLength = decoder.readCompactArrayLength(buffer, offset);
     offset += topicsLength.bytesRead;
 
-    List<KafkaTopicMetadata> topics = [];
+    final List<KafkaTopicMetadata> topics = [];
     for (int i = 0; i < topicsLength.value; i++) {
       final int errorCode = buffer.getInt16(offset);
       offset += 2;
@@ -148,7 +156,7 @@ class KafkaMetadataApi {
       final partitionsLenth = decoder.readCompactArrayLength(buffer, offset);
       offset += partitionsLenth.bytesRead;
 
-      List<KafkaPartitionMetadata> partitions = [];
+      final List<KafkaPartitionMetadata> partitions = [];
       for (int j = 0; j < partitionsLenth.value; j++) {
         final int pErrorCode = buffer.getInt16(offset);
         offset += 2;
@@ -166,7 +174,7 @@ class KafkaMetadataApi {
             decoder.readCompactArrayLength(buffer, offset);
         offset += replicaNodesLength.bytesRead;
 
-        List<int> replicaNodes = [];
+        final List<int> replicaNodes = [];
         for (int k = 0; k < replicaNodesLength.value; k++) {
           final int replicaNodeId = buffer.getInt32(offset);
           offset += 4;
@@ -176,7 +184,7 @@ class KafkaMetadataApi {
         final isrNodesLength = decoder.readCompactArrayLength(buffer, offset);
         offset += isrNodesLength.bytesRead;
 
-        List<int> isrNodes = [];
+        final List<int> isrNodes = [];
         for (int k = 0; k < isrNodesLength.value; k++) {
           final int isrNodeId = buffer.getInt32(offset);
           offset += 4;
@@ -187,7 +195,7 @@ class KafkaMetadataApi {
             decoder.readCompactArrayLength(buffer, offset);
         offset += offlineReplicasLength.bytesRead;
 
-        List<int> offlineReplicas = [];
+        final List<int> offlineReplicas = [];
         for (int k = 0; k < offlineReplicasLength.value; k++) {
           final int offlineReplicaId = buffer.getInt32(offset);
           offset += 4;
@@ -197,15 +205,18 @@ class KafkaMetadataApi {
         final int pTaggedField = buffer.getInt8(offset);
         offset += 1;
 
-        partitions.add(KafkaPartitionMetadata(
+        partitions.add(
+          KafkaPartitionMetadata(
             errorCode: pErrorCode,
-            errorMessage: (ERROR_MAP[pErrorCode] as Map)['message'],
+            errorMessage: (ERROR_MAP[pErrorCode]! as Map)['message'],
             partitionId: pId,
             leaderId: leaderId,
             leaderEpoch: leaderEpoch,
             replicas: offlineReplicas,
             isr: isrNodes,
-            offlineReplicas: offlineReplicas));
+            offlineReplicas: offlineReplicas,
+          ),
+        );
       }
 
       final int topicAuthorizedOperations = buffer.getInt32(offset);
@@ -214,12 +225,15 @@ class KafkaMetadataApi {
       final int tTaggedField = buffer.getInt8(offset);
       offset += 1;
 
-      topics.add(KafkaTopicMetadata(
+      topics.add(
+        KafkaTopicMetadata(
           topicName: name.value,
           partitions: partitions,
           errorCode: errorCode,
           isInternal: isInternal,
-          topicAuthorizedOperations: topicAuthorizedOperations));
+          topicAuthorizedOperations: topicAuthorizedOperations,
+        ),
+      );
     }
 
     final int clusterAuthorizedOperations = buffer.getInt32(offset);

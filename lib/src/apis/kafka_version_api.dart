@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/models/components/api_version.dart';
-import 'package:dart_kafka/src/models/responses/api_version_response.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
+import '../definitions/apis.dart';
+import '../definitions/message_headers_version.dart';
+import '../models/components/api_version.dart';
+import '../models/responses/api_version_response.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaVersionApi {
   final int apiKey = API_VERSIONS;
@@ -17,29 +17,33 @@ class KafkaVersionApi {
   /// Serialize the ApiVersionRequest to Byte
   Uint8List serialize({
     required int correlationId,
-    String? clientId,
     required int apiVersion,
+    String? clientId,
     String clientSoftwareName = '',
     String clientSoftwareVersion = '',
   }) {
     final buffer = BytesBuilder();
 
     if (apiVersion > 2) {
-      buffer.add(encoder.compactString(clientSoftwareName));
-      buffer.add(encoder.compactString(clientSoftwareVersion));
-      buffer.add(encoder.uint8(0)); // _tagged_field
+      buffer
+        ..add(encoder.compactString(clientSoftwareName))
+        ..add(encoder.compactString(clientSoftwareVersion))
+        ..add(encoder.uint8(0)); // _tagged_field
     }
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: MessageHeaderVersion.requestHeaderVersion(
-              apiVersion: apiVersion, apiKey: apiKey),
-          messageLength: buffer.length,
-          apiKey: apiKey,
+        version: MessageHeaderVersion.requestHeaderVersion(
           apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...buffer.toBytes()
+          apiKey: apiKey,
+        ),
+        messageLength: buffer.length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...buffer.toBytes(),
     ]);
   }
 
@@ -48,7 +52,7 @@ class KafkaVersionApi {
     final buffer = ByteData.sublistView(data);
     int offset = 0;
 
-    final errorCode = buffer.getInt16(offset, Endian.big);
+    final errorCode = buffer.getInt16(offset);
     offset += 2;
 
     int arrayLength;
@@ -57,7 +61,7 @@ class KafkaVersionApi {
       arrayLength = read.value;
       offset += read.bytesRead;
     } else {
-      arrayLength = buffer.getInt32(offset, Endian.big);
+      arrayLength = buffer.getInt32(offset);
       offset += 4;
     }
 
@@ -78,11 +82,13 @@ class KafkaVersionApi {
         offset += 1;
       }
 
-      apiVersions.add(ApiVersion(
-        apiKey: apiKey,
-        minVersion: minVersion,
-        maxVersion: maxVersion,
-      ));
+      apiVersions.add(
+        ApiVersion(
+          apiKey: apiKey,
+          minVersion: minVersion,
+          maxVersion: maxVersion,
+        ),
+      );
     }
 
     int? throttleTimeMs;

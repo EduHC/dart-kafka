@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../definitions/message_headers_version.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaLeaveGroupApi {
   final int apiKey = LEAVE_GROUP;
@@ -16,25 +16,27 @@ class KafkaLeaveGroupApi {
 
   /// Serialize the LeaveGroupRequest to bytes
   Uint8List serialize({
-    String? clientId,
-    String? memberId,
     required String groupId,
     required List<Member> members,
     required int correlationId,
     required int apiVersion,
+    String? clientId,
+    String? memberId,
   }) {
     BytesBuilder? byteBuffer = BytesBuilder();
 
     if (apiVersion > 2) {
       if (apiVersion > 3) {
-        byteBuffer.add(encoder.compactString(groupId));
-        byteBuffer.add(encoder.compactArrayLength(members.length));
+        byteBuffer
+          ..add(encoder.compactString(groupId))
+          ..add(encoder.compactArrayLength(members.length));
       } else {
-        byteBuffer.add(encoder.string(groupId));
-        byteBuffer.add(encoder.int32(members.length));
+        byteBuffer
+          ..add(encoder.string(groupId))
+          ..add(encoder.int32(members.length));
       }
 
-      for (Member member in members) {
+      for (final Member member in members) {
         if (apiVersion > 3) {
           byteBuffer.add(encoder.compactString(member.memberId));
         } else {
@@ -61,10 +63,12 @@ class KafkaLeaveGroupApi {
     } else {
       if (memberId == null) {
         throw Exception(
-            "MemberId passed as null to LeaveGroupRequest version < 3 and is a not null field.");
+            'MemberId passed as null to LeaveGroupRequest version < 3 and '
+            'is a not null field.');
       }
-      byteBuffer.add(encoder.string(groupId));
-      byteBuffer.add(encoder.string(memberId));
+      byteBuffer
+        ..add(encoder.string(groupId))
+        ..add(encoder.string(memberId));
     }
 
     final message = byteBuffer.toBytes();
@@ -73,14 +77,17 @@ class KafkaLeaveGroupApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: MessageHeaderVersion.requestHeaderVersion(
-              apiVersion: apiVersion, apiKey: apiKey),
-          messageLength: message.length,
-          apiKey: apiKey,
+        version: MessageHeaderVersion.requestHeaderVersion(
           apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...message
+          apiKey: apiKey,
+        ),
+        messageLength: message.length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...message,
     ]);
   }
 
@@ -108,7 +115,7 @@ class KafkaLeaveGroupApi {
       arrayLength = (bytesRead: 4, value: len);
     }
 
-    List<Member> members = [];
+    final List<Member> members = [];
     for (int i = 0; i < arrayLength.value; i++) {
       ({int bytesRead, String value}) memberId;
       if (apiVersion > 3) {
@@ -133,16 +140,15 @@ class KafkaLeaveGroupApi {
         Member(
           memberId: memberId.value,
           groupInstanceId: groupInstanceId.value,
-          reason: null,
           errorCode: errorCode,
-          errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+          errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
         ),
       );
     }
 
     return LeaveGroupResponse(
       errorCode: errorCode,
-      errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+      errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
       members: members,
       throttleTimeMs: throttleTimeMs,
     );

@@ -1,15 +1,14 @@
 class ProtocolMetadata {
+  ProtocolMetadata({
+    required this.version,
+    required this.topics,
+    this.userDataBytes,
+  });
   final int version;
   final List<String> topics;
   final List<int>? userDataBytes;
 
-  ProtocolMetadata(
-      {required this.version,
-      required this.topics,
-      this.userDataBytes});
-
   @override
-  String toString() {
-    return "ProtocolMetadata -> version: $version, topics: $topics, userDataBytes: $userDataBytes";
-  }
+  String toString() =>
+      'ProtocolMetadata -> version: $version, topics: $topics, userDataBytes: $userDataBytes';
 }

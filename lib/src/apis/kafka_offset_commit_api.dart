@@ -1,13 +1,13 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/models/responses/offset_commit_response.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../definitions/message_headers_version.dart';
+import '../models/responses/offset_commit_response.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaOffsetCommitApi {
   final int apiKey = OFFSET_COMMIT;
@@ -17,33 +17,34 @@ class KafkaOffsetCommitApi {
 
   /// Method to serialize the OffsetCommmitRequest
   Uint8List serialize({
-    String? clientId,
-    String? groupInstanceId,
     required int correlationId,
     required int apiVersion,
     required String groupId,
     required int generationIdOrMemberEpoch,
     required String memberId,
     required List<OffsetCommitTopic> topics,
+    String? clientId,
+    String? groupInstanceId,
   }) {
-    BytesBuilder? buffer = BytesBuilder();
+    BytesBuilder? buffer = BytesBuilder()
+      ..add(encoder.compactString(groupId))
+      ..add(encoder.int32(generationIdOrMemberEpoch))
+      ..add(encoder.compactString(memberId))
+      ..add(encoder.compactNullableString(groupInstanceId))
+      ..add(encoder.compactArrayLength(topics.length));
 
-    buffer.add(encoder.compactString(groupId));
-    buffer.add(encoder.int32(generationIdOrMemberEpoch));
-    buffer.add(encoder.compactString(memberId));
-    buffer.add(encoder.compactNullableString(groupInstanceId));
-    buffer.add(encoder.compactArrayLength(topics.length));
+    for (final OffsetCommitTopic topic in topics) {
+      buffer
+        ..add(encoder.compactString(topic.name))
+        ..add(encoder.compactArrayLength(topic.partitions.length));
 
-    for (OffsetCommitTopic topic in topics) {
-      buffer.add(encoder.compactString(topic.name));
-      buffer.add(encoder.compactArrayLength(topic.partitions.length));
-
-      for (OffsetCommitPartition partition in topic.partitions) {
-        buffer.add(encoder.int32(partition.id));
-        buffer.add(encoder.int64(partition.commitedOffset));
-        buffer.add(encoder.int32(partition.commitedLeaderEpoch));
-        buffer.add(encoder.compactNullableString(partition.commitedMetadata));
-        buffer.add(encoder.tagBuffer());
+      for (final OffsetCommitPartition partition in topic.partitions) {
+        buffer
+          ..add(encoder.int32(partition.id))
+          ..add(encoder.int64(partition.commitedOffset))
+          ..add(encoder.int32(partition.commitedLeaderEpoch))
+          ..add(encoder.compactNullableString(partition.commitedMetadata))
+          ..add(encoder.tagBuffer());
       }
 
       buffer.add(encoder.tagBuffer());
@@ -67,7 +68,7 @@ class KafkaOffsetCommitApi {
         correlationId: correlationId,
         clientId: clientId,
       ),
-      ...message
+      ...message,
     ]);
   }
 
@@ -82,7 +83,7 @@ class KafkaOffsetCommitApi {
     final topicsLen = decoder.readCompactArrayLength(buffer, offset);
     offset += topicsLen.bytesRead;
 
-    List<ResOffsetCommitTopic> topics = [];
+    final List<ResOffsetCommitTopic> topics = [];
     for (int i = 0; i < topicsLen.value; i++) {
       final name = decoder.readCompactString(buffer, offset);
       offset += name.bytesRead;
@@ -90,7 +91,7 @@ class KafkaOffsetCommitApi {
       final partitionsLen = decoder.readCompactArrayLength(buffer, offset);
       offset += partitionsLen.bytesRead;
 
-      List<ResOffsetCommitPartition> partitions = [];
+      final List<ResOffsetCommitPartition> partitions = [];
       for (int j = 0; j < partitionsLen.value; j++) {
         final id = buffer.getInt32(offset);
         offset += 4;
@@ -98,14 +99,14 @@ class KafkaOffsetCommitApi {
         final errorCode = buffer.getInt16(offset);
         offset += 2;
 
-        final pTaggedField = decoder.readTagBuffer(buffer, offset);
+        // final pTaggedField = decoder.readTagBuffer(buffer, offset);
         offset += 1;
 
         partitions.add(
           ResOffsetCommitPartition(
             id: id,
             errorCode: errorCode,
-            errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+            errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
           ),
         );
       }

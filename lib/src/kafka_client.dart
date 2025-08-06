@@ -2,15 +2,31 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/kafka_cluster.dart';
-import 'package:dart_kafka/src/models/request.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/traffic_controller.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
-import 'package:dart_kafka/src/definitions/types.dart';
+import '../dart_kafka.dart';
+import 'definitions/types.dart';
+import 'kafka_cluster.dart';
+import 'models/request.dart';
+import 'protocol/endocer.dart';
+import 'protocol/traffic_controller.dart';
+import 'protocol/utils.dart';
 
 class KafkaClient {
+  /// @Parameter brokers
+  ///    A list containing only the Host Address and the Port to access N Kafka Brokers
+  KafkaClient({
+    required List<Broker> brokers,
+    required this.rebalanceTimeoutMs,
+    required this.sessionTimeoutMs,
+    this.clientId,
+  }) {
+    _cluster.setBrokers(brokers);
+    _trafficControler = TrafficControler(
+      cluster: _cluster,
+      eventController: _eventController,
+      kafka: this,
+      admin: getAdminClient(),
+    );
+  }
   late final TrafficControler _trafficControler;
 
   final StreamController _eventController = StreamController();
@@ -39,23 +55,6 @@ class KafkaClient {
   bool get isProducerStarted => _producerStarted;
   bool get isAdminStarted => _adminStarted;
 
-  /// @Parameter brokers
-  ///    A list containing only the Host Address and the Port to access N Kafka Brokers
-  KafkaClient({
-    required List<Broker> brokers,
-    this.clientId,
-    required this.rebalanceTimeoutMs,
-    required this.sessionTimeoutMs,
-  }) {
-    _cluster.setBrokers(brokers);
-    _trafficControler = TrafficControler(
-      cluster: _cluster,
-      eventController: _eventController,
-      kafka: this,
-      admin: getAdminClient(),
-    );
-  }
-
   Future<void> connect() async {
     if (_started) return;
     await _cluster.connect(responseHandler: _handleResponse);
@@ -64,7 +63,7 @@ class KafkaClient {
 
   Future<void> close() async {
     while (hasPendingProcesses) {
-      await Future.delayed(Duration(seconds: 1));
+      await Future.delayed(const Duration(seconds: 1));
       continue;
     }
     _cluster.close();
@@ -72,29 +71,26 @@ class KafkaClient {
 
   // Request/Response controllers
   void _handleResponse(Uint8List response) {
-    _trafficControler.enqueueBrokerMessage(response);
-    _trafficControler.drainBrokerMessagesQueue();
+    _trafficControler
+      ..enqueueBrokerMessage(response)
+      ..drainBrokerMessagesQueue();
   }
 
   // Broker Related functions
   Socket getBrokerForPartition({
     required String topic,
     required int partition,
-  }) {
-    return _cluster.getBrokerForPartition(topic: topic, partition: partition);
-  }
+  }) =>
+      _cluster.getBrokerForPartition(topic: topic, partition: partition);
 
   Future<void> updateTopicsBroker({required MetadataResponse metadata}) async {
     await _cluster.updateTopicsBroker(metadata: metadata);
   }
 
-  Socket getAnyBroker() {
-    return _cluster.getAnyBroker();
-  }
+  Socket getAnyBroker() => _cluster.getAnyBroker();
 
-  Socket? getBrokerByHost({required String host, required int port}) {
-    return _cluster.getBrokerByHost(host: host, port: port);
-  }
+  Socket? getBrokerByHost({required String host, required int port}) =>
+      _cluster.getBrokerByHost(host: host, port: port);
 
   Future<dynamic> enqueueRequest({
     required Uint8List message,
@@ -112,7 +108,7 @@ class KafkaClient {
     Topic? topic,
     bool autoCommit = false,
   }) async {
-    Future<dynamic> res = _trafficControler.enqueuePendindRequest(
+    final Future<dynamic> res = _trafficControler.enqueuePendindRequest(
       message: message,
       correlationId: correlationId,
       apiKey: apiKey,
@@ -162,14 +158,14 @@ class KafkaClient {
   }
 
   Future<dynamic> commitMessage({required Request req}) async {
-    // build up the Topics to commit
-    // TODO: finalizar a implementação do método para Commitar os offsets no automático
+    // TODO(Eduardo): Finalize the implementation of Auto Commit messages
     if (req.topic == null) {
       throw Exception(
-          "Tryied to commit and request without the Topic information.");
+        'Tryied to commit and request without the Topic information.',
+      );
     }
-    List<OffsetCommitPartition> partitions = [];
-    for (Partition part in req.topic!.partitions ?? []) {
+    final List<OffsetCommitPartition> partitions = [];
+    for (final Partition part in req.topic!.partitions ?? []) {
       partitions.add(
         OffsetCommitPartition(
           id: part.id,

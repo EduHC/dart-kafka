@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/src/models/components/active_producer.dart';
-import 'package:dart_kafka/src/models/partition.dart';
-import 'package:dart_kafka/src/models/responses/describe_producer_response.dart';
-import 'package:dart_kafka/src/models/topic.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../models/components/active_producer.dart';
+import '../models/partition.dart';
+import '../models/responses/describe_producer_response.dart';
+import '../models/topic.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaDescribeProducerApi {
   final int apiKey = DESCRIBE_PRODUCERS;
@@ -19,21 +19,21 @@ class KafkaDescribeProducerApi {
   /// Serialize the DescribeProducerRequest
   Uint8List serialize({
     required int correlationId,
+    required List<Topic> topics,
     int apiVersion = 11,
     String? clientId,
-    required List<Topic> topics,
   }) {
-    BytesBuilder byteBuffer = BytesBuilder();
+    final BytesBuilder byteBuffer = BytesBuilder();
 
     if (topics.isEmpty) {
-      throw Exception("No topics informed for DescribeProducer");
+      throw Exception('No topics informed for DescribeProducer');
     }
 
     byteBuffer.add(encoder.compactArrayLength(topics.length));
     for (int i = 0; i < topics.length; i++) {
-      byteBuffer.add(encoder.compactString(topics[i].topicName));
       byteBuffer
-          .add(encoder.compactArrayLength(topics[i].partitions?.length ?? 0));
+        ..add(encoder.compactString(topics[i].topicName))
+        ..add(encoder.compactArrayLength(topics[i].partitions?.length ?? 0));
       for (int j = 0; j < (topics[i].partitions?.length ?? 0); j++) {
         byteBuffer.add(encoder.int32(topics[i].partitions![j].id));
       }
@@ -48,13 +48,14 @@ class KafkaDescribeProducerApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: 2,
-          messageLength: message.length,
-          apiKey: apiKey,
-          apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...message
+        version: 2,
+        messageLength: message.length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...message,
     ]);
   }
 
@@ -66,7 +67,7 @@ class KafkaDescribeProducerApi {
     final int throttleTime = buffer.getInt32(offset);
     offset += 4;
 
-    List<Topic> topics = [];
+    final List<Topic> topics = [];
     final topicsLength = decoder.readCompactArrayLength(buffer, offset);
     offset += topicsLength.bytesRead;
 
@@ -77,7 +78,7 @@ class KafkaDescribeProducerApi {
       final partitionsLength = decoder.readCompactArrayLength(buffer, offset);
       offset += partitionsLength.bytesRead;
 
-      List<Partition> partitions = [];
+      final List<Partition> partitions = [];
       for (int j = 0; j < partitionsLength.value; j++) {
         final int partitionId = buffer.getInt32(offset);
         offset += 4;
@@ -92,7 +93,7 @@ class KafkaDescribeProducerApi {
             decoder.readCompactArrayLength(buffer, offset);
         offset += activeProducerLength.bytesRead;
 
-        List<ActiveProducer> activeProducers = [];
+        final List<ActiveProducer> activeProducers = [];
         for (int k = 0; k < activeProducerLength.value; k++) {
           final int producerId = buffer.getInt64(offset);
           offset += 8;
@@ -112,33 +113,39 @@ class KafkaDescribeProducerApi {
           final int currentTxnStartOffset = buffer.getInt64(offset);
           offset += 8;
 
-          final int activePRoducerTaggedField = buffer.getInt8(offset);
+          // final int activePRoducerTaggedField = buffer.getInt8(offset);
           offset += 1;
 
-          activeProducers.add(ActiveProducer(
+          activeProducers.add(
+            ActiveProducer(
               id: producerId,
               epoch: producerEpoch,
               lastSequence: lastSequence,
               lastTimestamp: lastTimestamp,
               coordinatorEpoch: coordinatorEpoch,
-              currentTxnStartOffset: currentTxnStartOffset));
+              currentTxnStartOffset: currentTxnStartOffset,
+            ),
+          );
         }
 
-        final int partitionTaggedField = buffer.getInt8(offset);
+        // final int partitionTaggedField = buffer.getInt8(offset);
         offset += 1;
 
-        partitions.add(Partition(
+        partitions.add(
+          Partition(
             id: partitionId,
             activeProducers: activeProducers,
             errorCode: errorCode,
-            errorMessage: errorMessage.value ??
-                (ERROR_MAP[errorCode] as Map)['message']));
+            errorMessage:
+                errorMessage.value ?? (ERROR_MAP[errorCode]! as Map)['message'],
+          ),
+        );
       }
 
       topics.add(Topic(topicName: topicName.value, partitions: partitions));
     }
 
-    final int baseTaggedField = buffer.getInt8(offset);
+    // final int baseTaggedField = buffer.getInt8(offset);
     offset += 1;
 
     return DescribeProducerResponse(throttleTime: throttleTime, topics: topics);

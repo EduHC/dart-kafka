@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaListOffsetApi {
   final int apiKey = LIST_OFFSETS;
@@ -17,23 +17,21 @@ class KafkaListOffsetApi {
   Uint8List serialize({
     required int correlationId,
     required int apiVersion,
-    String? clientId,
     required int replicaId,
     required int isolationLevel,
     required List<Topic> topics,
     required int leaderEpoch,
     required int limit,
     required DateTime timestamp,
+    String? clientId,
   }) {
-    final byteBuffer = BytesBuilder();
-
-    byteBuffer.add(encoder.int32(replicaId));
+    final byteBuffer = BytesBuilder()..add(encoder.int32(replicaId));
     if (apiVersion > 1) {
       byteBuffer.add(encoder.int8(isolationLevel));
     }
     byteBuffer.add(encoder.compactArrayLength(topics.length));
 
-    for (Topic topic in topics) {
+    for (final Topic topic in topics) {
       if (apiVersion > 5) {
         byteBuffer.add(encoder.compactString(topic.topicName));
       } else {
@@ -41,7 +39,7 @@ class KafkaListOffsetApi {
       }
       byteBuffer.add(encoder.compactArrayLength(topic.partitions?.length ?? 0));
 
-      for (Partition partition in topic.partitions ?? []) {
+      for (final Partition partition in topic.partitions ?? []) {
         byteBuffer.add(encoder.int32(partition.id));
         if (apiVersion > 3) {
           byteBuffer.add(encoder.int32(leaderEpoch));
@@ -65,13 +63,14 @@ class KafkaListOffsetApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          apiKey: apiKey,
-          apiVersion: apiVersion,
-          clientId: clientId,
-          correlationId: correlationId,
-          messageLength: message.length,
-          version: apiVersion > 6 ? 2 : 1),
-      ...message
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        clientId: clientId,
+        correlationId: correlationId,
+        messageLength: message.length,
+        version: apiVersion > 6 ? 2 : 1,
+      ),
+      ...message,
     ]);
   }
 
@@ -86,7 +85,7 @@ class KafkaListOffsetApi {
     final topicsLength = decoder.readCompactArrayLength(buffer, offset);
     offset += topicsLength.bytesRead;
 
-    List<Topic> topics = [];
+    final List<Topic> topics = [];
     for (int i = 0; i < topicsLength.value; i++) {
       final topicName = decoder.readCompactString(buffer, offset);
       offset += topicName.bytesRead;
@@ -94,7 +93,7 @@ class KafkaListOffsetApi {
       final partitionsLength = decoder.readCompactArrayLength(buffer, offset);
       offset += partitionsLength.bytesRead;
 
-      List<Partition> partitions = [];
+      final List<Partition> partitions = [];
       for (int j = 0; j < partitionsLength.value; j++) {
         final int id = buffer.getInt32(offset);
         offset += 4;
@@ -118,7 +117,7 @@ class KafkaListOffsetApi {
           Partition(
             id: id,
             errorCode: errorCode,
-            errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+            errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
             timestamp: timestamp,
             offset: pOffset,
             leaderEpoch: leaderEpoch,

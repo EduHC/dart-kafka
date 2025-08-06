@@ -8,23 +8,17 @@ class RecordHeader {
   RecordHeader({required this.key, required this.value});
 
   @override
-  String toString() {
-    return "RecordHeader -> headerKey: $key, headerValue: $value";
-  }
+  String toString() => 'RecordHeader -> headerKey: $key, headerValue: $value';
 
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'key': key,
-      'value': value,
-    };
-  }
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'key': key,
+        'value': value,
+      };
 
-  factory RecordHeader.fromMap(Map<String, dynamic> map) {
-    return RecordHeader(
-      key: map['key'] as String,
-      value: map['value'] as dynamic,
-    );
-  }
+  factory RecordHeader.fromMap(Map<String, dynamic> map) => RecordHeader(
+        key: map['key'] as String,
+        value: map['value'] as dynamic,
+      );
 
   String toJson() => json.encode(toMap());
 

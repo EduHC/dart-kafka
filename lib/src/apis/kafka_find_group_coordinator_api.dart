@@ -1,11 +1,11 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/message_headers_version.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaFindGroupCoordinatorApi {
   final int apiKey = FIND_COORDINATOR;
@@ -13,17 +13,19 @@ class KafkaFindGroupCoordinatorApi {
   final Encoder encoder = Encoder();
   final Decoder decoder = Decoder();
 
-  Uint8List serialize(
-      {required int correlationId,
-      required List<String> groups,
-      required int apiVersion,
-      String? clientId,
-      required int coordinatorType}) {
+  Uint8List serialize({
+    required int correlationId,
+    required List<String> groups,
+    required int apiVersion,
+    required int coordinatorType,
+    String? clientId,
+  }) {
     final byteBuffer = BytesBuilder();
 
     if (apiVersion > 3) {
-      byteBuffer.add(encoder.int8(coordinatorType));
-      byteBuffer.add(encoder.compactArrayLength(groups.length));
+      byteBuffer
+        ..add(encoder.int8(coordinatorType))
+        ..add(encoder.compactArrayLength(groups.length));
       for (int i = 0; i < groups.length; i++) {
         byteBuffer.add(encoder.compactString(groups[i]));
       }
@@ -44,14 +46,17 @@ class KafkaFindGroupCoordinatorApi {
 
     return Uint8List.fromList([
       ...encoder.writeMessageHeader(
-          version: MessageHeaderVersion.requestHeaderVersion(
-              apiVersion: apiVersion, apiKey: apiKey),
-          messageLength: message.length,
-          apiKey: apiKey,
+        version: MessageHeaderVersion.requestHeaderVersion(
           apiVersion: apiVersion,
-          correlationId: correlationId,
-          clientId: clientId),
-      ...message
+          apiKey: apiKey,
+        ),
+        messageLength: message.length,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        correlationId: correlationId,
+        clientId: clientId,
+      ),
+      ...message,
     ]);
   }
 
@@ -116,7 +121,7 @@ class KafkaFindGroupCoordinatorApi {
       port = null;
     }
 
-    List<Coordinator> coordinators = [];
+    final List<Coordinator> coordinators = [];
     if (apiVersion > 3) {
       final coordinatorsLength = decoder.readCompactArrayLength(buffer, offset);
       offset += coordinatorsLength.bytesRead;
@@ -143,13 +148,16 @@ class KafkaFindGroupCoordinatorApi {
         final cTaggedField = decoder.readTagBuffer(buffer, offset);
         offset += 1;
 
-        coordinators.add(Coordinator(
+        coordinators.add(
+          Coordinator(
             key: key.value,
             nodeId: nodeId,
             host: cHost.value,
             port: cPort,
             errorCode: cErrorCode,
-            errorMessage: cErrorMessage.value));
+            errorMessage: cErrorMessage.value,
+          ),
+        );
       }
     }
 
@@ -162,12 +170,13 @@ class KafkaFindGroupCoordinatorApi {
     }
 
     return FindGroupCoordinatorResponse(
-        throttleTimeMs: throttleTimeMs,
-        nodeId: nodeId,
-        host: host.value,
-        port: port,
-        errorCode: errorCode,
-        errorMessage: errorMessage.value,
-        coordinators: coordinators);
+      throttleTimeMs: throttleTimeMs,
+      nodeId: nodeId,
+      host: host.value,
+      port: port,
+      errorCode: errorCode,
+      errorMessage: errorMessage.value,
+      coordinators: coordinators,
+    );
   }
 }

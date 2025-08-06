@@ -1,7 +1,10 @@
-import 'package:dart_kafka/src/definitions/apis.dart';
+import 'apis.dart';
 
 class MessageHeaderVersion {
-  static int requestHeaderVersion({required int apiVersion, required int apiKey}) {
+  static int requestHeaderVersion({
+    required int apiVersion,
+    required int apiKey,
+  }) {
     switch (apiKey) {
       case PRODUCE:
         if (apiVersion >= 9) return 2;
@@ -177,11 +180,14 @@ class MessageHeaderVersion {
       case REMOVE_RAFT_VOTER:
         return 2;
       default:
-        throw UnsupportedError("Unsupported API key $apiKey");
+        throw UnsupportedError('Unsupported API key $apiKey');
     }
   }
 
-  static int responseHeaderVersion({required int apiVersion, required int apiKey}) {
+  static int responseHeaderVersion({
+    required int apiVersion,
+    required int apiKey,
+  }) {
     switch (apiKey) {
       case PRODUCE:
         if (apiVersion >= 9) return 1;
@@ -356,7 +362,7 @@ class MessageHeaderVersion {
       case REMOVE_RAFT_VOTER:
         return 1;
       default:
-        throw UnsupportedError("Unsupported API key $apiKey");
+        throw UnsupportedError('Unsupported API key $apiKey');
     }
   }
 }

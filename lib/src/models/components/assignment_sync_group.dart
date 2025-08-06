@@ -1,16 +1,14 @@
-import 'package:dart_kafka/dart_kafka.dart';
+import '../../../dart_kafka.dart';
 
 class AssignmentSyncGroup {
-  final String memberId;
-  final Assignment? assignment;
-
   AssignmentSyncGroup({
     required this.memberId,
     this.assignment,
   });
+  final String memberId;
+  final Assignment? assignment;
 
   @override
-  String toString() {
-    return "AssignmentSyncGroup -> memberId: $memberId, assigment: $assignment";
-  }
+  String toString() =>
+      'AssignmentSyncGroup -> memberId: $memberId, assigment: $assignment';
 }

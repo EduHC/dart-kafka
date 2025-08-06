@@ -8,24 +8,19 @@ class RecordError {
   RecordError({required this.batchIndex, this.errorMessage});
 
   @override
-  String toString() {
-    return "RecordError -> batchIndex: $batchIndex, errorMessage: $errorMessage";
-  }
+  String toString() =>
+      'RecordError -> batchIndex: $batchIndex, errorMessage: $errorMessage';
 
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'batchIndex': batchIndex,
-      'errorMessage': errorMessage,
-    };
-  }
+  Map<String, dynamic> toMap() => <String, dynamic>{
+        'batchIndex': batchIndex,
+        'errorMessage': errorMessage,
+      };
 
-  factory RecordError.fromMap(Map<String, dynamic> map) {
-    return RecordError(
-      batchIndex: map['batchIndex'] as int,
-      errorMessage:
-          map['errorMessage'] != null ? map['errorMessage'] as String : null,
-    );
-  }
+  factory RecordError.fromMap(Map<String, dynamic> map) => RecordError(
+        batchIndex: map['batchIndex'] as int,
+        errorMessage:
+            map['errorMessage'] != null ? map['errorMessage'] as String : null,
+      );
 
   String toJson() => json.encode(toMap());
 

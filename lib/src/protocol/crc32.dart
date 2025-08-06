@@ -5,7 +5,7 @@ class CRC32C {
 
   static int calculate(Uint8List data, [int crc = 0]) {
     crc ^= 0xFFFFFFFF;
-    for (var byte in data) {
+    for (final byte in data) {
       crc = _table[(crc ^ byte) & 0xFF] ^ (crc >>> 8);
     }
     return crc ^ 0xFFFFFFFF;
@@ -13,7 +13,7 @@ class CRC32C {
 
   static List<int> _generateTable() {
     const int polynomial = 0x82F63B78;
-    List<int> table = List.filled(256, 0);
+    final List<int> table = List.filled(256, 0);
 
     for (int i = 0; i < 256; i++) {
       int crc = i;

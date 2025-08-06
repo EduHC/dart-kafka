@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 
-import 'package:dart_kafka/dart_kafka.dart';
-import 'package:dart_kafka/src/definitions/apis.dart';
-import 'package:dart_kafka/src/definitions/errors.dart';
-import 'package:dart_kafka/src/definitions/message_headers_version.dart';
-import 'package:dart_kafka/src/protocol/decoder.dart';
-import 'package:dart_kafka/src/protocol/endocer.dart';
-import 'package:dart_kafka/src/protocol/utils.dart';
+import '../../dart_kafka.dart';
+import '../definitions/apis.dart';
+import '../definitions/errors.dart';
+import '../definitions/message_headers_version.dart';
+import '../protocol/decoder.dart';
+import '../protocol/endocer.dart';
+import '../protocol/utils.dart';
 
 class KafkaOffsetFetchApi {
   final int apiKey = OFFSET_FETCH;
@@ -16,26 +16,27 @@ class KafkaOffsetFetchApi {
 
   /// Method to serialize the OffsetFetchRequest
   Uint8List serialize({
-    String? clientId,
     required int correlationId,
     required int apiVersion,
     required List<RequestGroup> groups,
     required bool requireStable,
+    String? clientId,
   }) {
-    BytesBuilder? buffer = BytesBuilder();
+    BytesBuilder? buffer = BytesBuilder()
+      ..add(encoder.compactArrayLength(groups.length));
+    for (final RequestGroup group in groups) {
+      buffer
+        ..add(encoder.compactString(group.groupId))
+        ..add(encoder.compactNullableString(group.memberId))
+        ..add(encoder.int32(group.memberEpoch))
+        ..add(encoder.compactArrayLength(group.topics.length));
 
-    buffer.add(encoder.compactArrayLength(groups.length));
-    for (RequestGroup group in groups) {
-      buffer.add(encoder.compactString(group.groupId));
-      buffer.add(encoder.compactNullableString(group.memberId));
-      buffer.add(encoder.int32(group.memberEpoch));
-      buffer.add(encoder.compactArrayLength(group.topics.length));
+      for (final GroupTopic topic in group.topics) {
+        buffer
+          ..add(encoder.compactString(topic.name))
+          ..add(encoder.compactArrayLength(topic.partitions.length));
 
-      for (GroupTopic topic in group.topics) {
-        buffer.add(encoder.compactString(topic.name));
-        buffer.add(encoder.compactArrayLength(topic.partitions.length));
-
-        for (int id in topic.partitions) {
+        for (final int id in topic.partitions) {
           buffer.add(encoder.int32(id));
         }
 
@@ -45,8 +46,9 @@ class KafkaOffsetFetchApi {
       buffer.add(encoder.tagBuffer());
     }
 
-    buffer.add(encoder.boolean(requireStable));
-    buffer.add(encoder.tagBuffer());
+    buffer
+      ..add(encoder.boolean(value: requireStable))
+      ..add(encoder.tagBuffer());
 
     final message = buffer.toBytes();
     buffer.clear();
@@ -64,7 +66,7 @@ class KafkaOffsetFetchApi {
         correlationId: correlationId,
         clientId: clientId,
       ),
-      ...message
+      ...message,
     ]);
   }
 
@@ -79,9 +81,9 @@ class KafkaOffsetFetchApi {
       offset += 4;
     }
 
-    List<ResponseGroup> groups = [];
-    List<OffsetFetchTopic> topics = [];
-    List<OffsetFetchPartition> partitions = [];
+    final List<ResponseGroup> groups = [];
+    final List<OffsetFetchTopic> topics = [];
+    final List<OffsetFetchPartition> partitions = [];
 
     if (apiVersion < 8) {
       ({int bytesRead, int value}) topicsLen;
@@ -148,7 +150,7 @@ class KafkaOffsetFetchApi {
               commitedOffset: commitedOffset,
               commitedLeaderEpoch: commitedLeaderEpoch,
               errorCode: errorCode,
-              errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+              errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
             ),
           );
         }
@@ -166,7 +168,7 @@ class KafkaOffsetFetchApi {
             name: topicName.value,
             partitions: partitions,
             errorCode: errorCode,
-            errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+            errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
           ),
         );
       }
@@ -235,7 +237,7 @@ class KafkaOffsetFetchApi {
                 commitedOffset: commitedOffset,
                 commitedLeaderEpoch: commitedLeaderEpoch,
                 errorCode: errorCode,
-                errorMessage: (ERROR_MAP[errorCode] as Map)['message'],
+                errorMessage: (ERROR_MAP[errorCode]! as Map)['message'],
               ),
             );
           }
@@ -251,7 +253,7 @@ class KafkaOffsetFetchApi {
         final errorCode = buffer.getInt16(offset);
         offset += 2;
 
-        int gTaggedField = decoder.readTagBuffer(buffer, offset);
+        final int gTaggedField = decoder.readTagBuffer(buffer, offset);
         offset += 1;
 
         groups.add(
