@@ -1,9 +1,17 @@
 import 'dart:math';
 import 'dart:typed_data';
-import '../models/components/record_header.dart';
+import '../common/record_header.dart';
 import 'crc32.dart';
 
 class Utils {
+  factory Utils() {
+    _instance ??= Utils._();
+    return _instance!;
+  }
+
+  Utils._();
+  static Utils? _instance;
+
   int crc32c(Uint8List data) => CRC32C.calculate(data);
 
   int generateCorrelationId() {

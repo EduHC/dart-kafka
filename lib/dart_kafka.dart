@@ -1,8 +1,8 @@
 library;
 
-export 'src/kafka_admin.dart';
-export 'src/kafka_client.dart';
-export 'src/kafka_consumer.dart';
-export 'src/kafka_producer.dart';
+export 'src/client/kafka_admin.dart';
+export 'src/client/kafka_client.dart';
+export 'src/client/kafka_consumer.dart';
+export 'src/client/kafka_producer.dart';
 // Models
-export 'src/models/export_models.dart';
+export 'src/export_model.dart';

@@ -1,6 +1,14 @@
 import 'dart:typed_data';
 
 class CRC32C {
+  factory CRC32C() {
+    _instance ??= CRC32C._();
+    return _instance!;
+  }
+
+  CRC32C._();
+  static CRC32C? _instance;
+
   static final List<int> _table = _generateTable();
 
   static int calculate(Uint8List data, [int crc = 0]) {

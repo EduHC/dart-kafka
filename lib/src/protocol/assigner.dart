@@ -4,6 +4,14 @@ const name = 'RoundRobinAssigner';
 const version = 1;
 
 class Assigner {
+  factory Assigner() {
+    _instance ??= Assigner._();
+    return _instance!;
+  }
+
+  Assigner._();
+  static Assigner? _instance;
+
   static List<Protocol> protocol({required List<String> topics}) {
     final Protocol protocol = Protocol(
       name: name,
@@ -22,6 +30,7 @@ class Assigner {
     required List<Member> members,
     required bool isLeader,
   }) =>
+      // TODO(Eduardo): Ajustar para um algorítimo estilo RoundRobin e/ ou mais de um.
       members.map(
         (member) {
           if (member.metadata == null) {

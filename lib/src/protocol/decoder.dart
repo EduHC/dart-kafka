@@ -1,6 +1,14 @@
 import 'dart:typed_data';
 
 class Decoder {
+  factory Decoder() {
+    _instance ??= Decoder._();
+    return _instance!;
+  }
+
+  Decoder._();
+  static Decoder? _instance;
+
   bool readBool(ByteData buffer, int offset) {
     final value = buffer.getInt8(offset);
     return value > 0;
