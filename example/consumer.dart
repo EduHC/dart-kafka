@@ -2,14 +2,15 @@ import 'package:dart_kafka/dart_kafka.dart';
 
 void main() async {
   final List<Broker> brokers = [
-    Broker(host: '192.168.10.57', port: 29092),
-    // Broker(host: '192.168.200.131', port: 29092),
-    // Broker(host: '192.168.200.131', port: 29093),
-    // Broker(host: '192.168.200.131', port: 29094),
+    // Broker(host: '192.168.10.57', port: 29092),
+    Broker(host: 'kafka-enge.smartbr.com', port: 29092),
+    Broker(host: 'kafka-enge.smartbr.com', port: 29093),
+    Broker(host: 'kafka-enge.smartbr.com', port: 29094),
   ];
   final KafkaClient kafka = KafkaClient(
     brokers: brokers,
-    sessionTimeoutMs: 1800000,
+    // sessionTimeoutMs: 1800000,
+    sessionTimeoutMs: 180000,
     rebalanceTimeoutMs: 1500,
   );
   await kafka.connect();
@@ -23,60 +24,58 @@ void main() async {
   );
 
   final KafkaAdmin admin = kafka.getAdminClient();
-  const String serialNumber = 'testeomnilightvitaverse';
+  const String serialNumber = 'OMG000000000000';
   final List<String> topicsToConsume = [
-    '$serialNumber.location',
-    '$serialNumber.status',
-    '$serialNumber.sensors',
-    '$serialNumber.machine_config',
-    '$serialNumber.control',
+    // '$serialNumber.location',
+    // '$serialNumber.status',
+    // '$serialNumber.sensors',
+    // '$serialNumber.machine_config',
+    // '$serialNumber.control',
     '$serialNumber.control_key',
-    '$serialNumber.api_logs',
-    '$serialNumber.machine_logs',
+    // '$serialNumber.api_logs',
+    // '$serialNumber.machine_logs',
   ];
   await admin.updateTopicsMetadata(
     topics: topicsToConsume,
   );
 
-  int offset = 0;
-  const bool hasMore = true;
+  // int offset = 0;
+  // const bool hasMore = true;
 
-  while (hasMore) {
-    final FetchResponse res = await consumer.sendFetchRequest(
-      async: false,
-      apiVersion: 8,
-      isolationLevel: 0,
-      topics: [
-        Topic(
-          topicName: '$serialNumber.control',
-          partitions: [
-            Partition(id: 0, fetchOffset: offset),
-          ],
-        ),
-      ],
-    );
+  // while (hasMore) {
+  //   final FetchResponse res = await consumer.sendFetchRequest(
+  //     async: false,
+  //     apiVersion: 8,
+  //     isolationLevel: 0,
+  //     topics: [
+  //       Topic(
+  //         topicName: '$serialNumber.control',
+  //         partitions: [
+  //           Partition(id: 0, fetchOffset: offset),
+  //         ],
+  //       ),
+  //     ],
+  //   );
 
-    print(res);
+  //   print(res);
 
-    if (res.topics.isEmpty) continue;
-    final Topic topic = res.topics.first;
+  //   if (res.topics.isEmpty) continue;
+  //   final Topic topic = res.topics.first;
 
-    if (topic.partitions == null || topic.partitions!.isEmpty) continue;
-    final Partition part = topic.partitions!.first;
+  //   if (topic.partitions == null || topic.partitions!.isEmpty) continue;
+  //   final Partition part = topic.partitions!.first;
 
-    if (part.batch == null) continue;
-    if (part.batch!.records == null || part.batch!.records!.isEmpty) continue;
+  //   if (part.batch == null) continue;
+  //   if (part.batch!.records == null || part.batch!.records!.isEmpty) continue;
 
-    offset += 1;
-  }
+  //   offset += 1;
+  // }
 
-  // await consumer.subscribe(
-  //   topicsToSubscribe: [
-  //     'testeomnilightvitaverse.status',
-  //     'testeomnilightvitaverse.sensors',
-  //   ],
-  //   groupId: 'norman',
-  // );
+  await consumer.subscribe(
+    topicsToSubscribe: topicsToConsume,
+    groupId: 'TESTE-BATATA-POTATO-KARTOFFEL',
+    groupInstanceId: '1',
+  );
 
   // kafka.close();
   // return;

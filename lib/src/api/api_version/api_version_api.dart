@@ -28,7 +28,7 @@ class KafkaVersionApi {
       buffer
         ..add(encoder.compactString(clientSoftwareName))
         ..add(encoder.compactString(clientSoftwareVersion))
-        ..add(encoder.taggedField()); // _tagged_field
+        ..add(encoder.taggedField());
     }
 
     return Uint8List.fromList([

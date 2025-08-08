@@ -251,8 +251,13 @@ class KafkaOffsetFetchApi {
           offset += 1;
 
           topics.add(
-            OffsetFetchTopic(name: topicName.value, partitions: partitions),
+            OffsetFetchTopic(
+              name: topicName.value,
+              partitions: [...partitions],
+            ),
           );
+
+          partitions.clear();
         }
 
         final errorCode = buffer.getInt16(offset);

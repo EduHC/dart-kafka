@@ -9,6 +9,7 @@ import '../api/heartbeat/heartbeat_api.dart';
 import '../api/join_group/join_group_api.dart';
 import '../api/join_group/join_group_response.dart';
 import '../api/list_offset/list_offset_api.dart';
+import '../api/list_offset/list_offset_response.dart';
 import '../api/offset_commit/component/offset_commit_topic.dart';
 import '../api/offset_commit/offset_commit_api.dart';
 import '../api/offset_fetch/component/response/offset_fetch_topic.dart';
@@ -80,7 +81,6 @@ class KafkaConsumer {
     bool async = true,
     String? groupId,
     String? memberId,
-    bool autoCommit = false,
     String? groupInstanceId,
   }) async {
     final List<Future<dynamic>> responses = [];
@@ -112,7 +112,7 @@ class KafkaConsumer {
           partition: partition.id,
           message: message,
           async: async,
-          autoCommit: autoCommit,
+          autoCommit: kafka.autoCommit,
           groupId: groupId,
           memberId: memberId,
           groupInstanceId: groupInstanceId,
@@ -177,7 +177,7 @@ class KafkaConsumer {
     return res;
   }
 
-  Future<dynamic> sendListOffsetsRequest({
+  Future<List<ListOffsetResponse>> sendListOffsetsRequest({
     required int isolationLevel,
     required List<Topic> topics,
     int? correlationId,
@@ -225,10 +225,11 @@ class KafkaConsumer {
 
     if (async) {
       responses.clear();
-      return;
+      return [];
     }
 
-    return Future.wait(responses);
+    final List<dynamic> res = await Future.wait(responses);
+    return res.cast<ListOffsetResponse>().toList();
   }
 
   /// @Param groups in ApiVersion < 4 will consider only the FISRT element for the Kafka gets a single Key per request
@@ -287,8 +288,9 @@ class KafkaConsumer {
       clientId: kafka.clientId,
     );
 
-    // debugPrint("${DateTime.now()} || [APP] HeartbeatRequest: $message");
+    // print('${DateTime.now()} || [APP] HeartbeatRequest: $message');
     final Future<dynamic> res = kafka.enqueueRequest(
+      broker: _brokerGroupLeader,
       message: message,
       correlationId: finalCorrelationId,
       apiKey: HEARTBEAT,
@@ -454,32 +456,31 @@ class KafkaConsumer {
     final Coordinator c = cResponse.coordinators!.first;
     _brokerGroupLeader = kafka.getBrokerByHost(host: c.host, port: c.port);
 
-    JoinGroupResponse joinRes = await sendJoinGroupRequest(
-      groupId: groupId,
-      sessionTimeoutMs: kafka.sessionTimeoutMs,
-      rebalanceTimeoutMs: kafka.rebalanceTimeoutMs,
-      memberId: _memberId ?? '',
-      protocolType: 'consumer',
-      protocols: Assigner.protocol(topics: _topicsToSubscribe.toList()),
-      groupInstanceId: _groupInstanceId,
-      broker: _brokerGroupLeader,
-      async: false,
-    );
+    JoinGroupResponse? joinRes;
+    bool continueToRequest = true;
+    int countRetry = 0;
 
-    if (joinRes.errorCode == 79) {
+    do {
       joinRes = await sendJoinGroupRequest(
         groupId: groupId,
         sessionTimeoutMs: kafka.sessionTimeoutMs,
         rebalanceTimeoutMs: kafka.rebalanceTimeoutMs,
-        memberId: joinRes.memberId,
+        memberId: _memberId ?? '',
         protocolType: 'consumer',
         protocols: Assigner.protocol(topics: _topicsToSubscribe.toList()),
-        groupInstanceId: groupInstanceId,
+        groupInstanceId: _groupInstanceId,
         broker: _brokerGroupLeader,
         async: false,
       );
-    }
 
+      // Will execute only one more time AND if the result was errorCode 79
+      continueToRequest = joinRes?.errorCode == 79 && countRetry == 0;
+      countRetry++;
+    } while (continueToRequest);
+
+    if (joinRes == null) {
+      throw Exception('Unable to get the JoinGroup Response');
+    }
     if (joinRes.errorCode != 0) throw Exception(joinRes.errorMessage);
 
     _memberIdGroupLeader = joinRes.leader;
@@ -614,14 +615,14 @@ class KafkaConsumer {
       const Duration(seconds: 1),
       (timer) async {
         try {
-          // print("${DateTime.now()} | [FetchRequest] Sending fetch for group: $key");
+          print(
+              '${DateTime.now()} | [FetchRequest] Sending fetch for group: $key');
           await sendFetchRequest(
             apiVersion: 8,
             topics: topics,
             groupId: groupId,
             memberId: memberId,
             groupInstanceId: groupInstanceId,
-            autoCommit: true,
           );
         } catch (e) {
           throw Exception(e);
@@ -673,14 +674,56 @@ class KafkaConsumer {
       async: false,
       broker: _brokerGroupLeader,
     );
-    print(ofRes);
-    updateMemberMetadata(res: ofRes, groupId: groupId);
+
+    final List<Topic> topics = groupData
+        .map(
+          (e) => Topic(
+              topicName: e.topicName,
+              partitions: e.partitions
+                  .map(
+                    (p) => Partition(id: p.partitionId),
+                  )
+                  .toList()),
+        )
+        .toList();
+
+    final List<ListOffsetResponse> currentOffsets =
+        await sendListOffsetsRequest(
+      isolationLevel: 1,
+      topics: topics,
+      async: false,
+    );
+    updateMemberMetadata(
+      res: ofRes,
+      groupId: groupId,
+      baseOffsets: currentOffsets,
+    );
   }
 
   void updateMemberMetadata({
     required OffsetFetchResponse res,
     required String groupId,
+    required List<ListOffsetResponse> baseOffsets,
   }) {
+    final Map<String, Map<String, int>> kafkaBaseOffset = {};
+
+    for (final ListOffsetResponse res in baseOffsets) {
+      for (final Topic topic in res.topics) {
+        final topicName = topic.topicName;
+        final partitions = topic.partitions ?? [];
+
+        kafkaBaseOffset.putIfAbsent(topicName, () => {});
+
+        for (final Partition partition in partitions) {
+          final partitionId = partition.id.toString();
+          final offset = partition.offset;
+
+          if (offset == null) continue;
+          kafkaBaseOffset[topicName]![partitionId] = offset;
+        }
+      }
+    }
+
     for (final ResponseGroup group in res.groups) {
       if (group.errorCode != 0) {
         throw Exception(group.errorMessage);
@@ -691,14 +734,19 @@ class KafkaConsumer {
         groupData.add(
           GroupData(
             topicName: topic.name,
-            partitions: topic.partitions
-                .map(
-                  (partition) => GroupPartitionData(
-                    partitionId: partition.id,
-                    offset: partition.commitedOffset,
-                  ),
-                )
-                .toList(),
+            partitions: topic.partitions.map(
+              (partition) {
+                final bool useBaseOffset = partition.commitedOffset < 0;
+                final int offset = useBaseOffset
+                    ? kafkaBaseOffset[topic.name]![partition.id.toString()] ?? 0
+                    : (partition.commitedOffset);
+
+                return GroupPartitionData(
+                  partitionId: partition.id,
+                  offset: offset,
+                );
+              },
+            ).toList(),
           ),
         );
       }

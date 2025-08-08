@@ -113,9 +113,8 @@ class Cluster {
       _sockets['$host:$port'];
 
   Future<void> updateTopicsBroker({required MetadataResponse metadata}) async {
-    print('[DART-KAFKA] Entrou para atualziar topicos no Broker!');
-    print('[DART-KAFKA] Topics Antes de alterar: $_topicsBrokers');
-    // print('[DART-KAFKA] Recebido: $metadata');
+    // print('[DART-KAFKA] Entrou para atualziar topicos no Broker!');
+    // print('[DART-KAFKA] Topics Antes de alterar: $_topicsBrokers');
     _topicsBrokers.clear();
     Map? brokers = {
       for (final b in metadata.brokers) b.nodeId: '${b.host}:${b.port}',
@@ -131,7 +130,7 @@ class Cluster {
       }
     }
 
-    print('[DART-KAFKA] Topics Depois de alterar: $_topicsBrokers');
+    // print('[DART-KAFKA] Topics Depois de alterar: $_topicsBrokers');
     brokers.clear();
     brokers = null;
   }

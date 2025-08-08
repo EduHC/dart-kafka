@@ -183,4 +183,7 @@ class MockKafkaClient implements KafkaClient {
 
   @override
   Utils get utils => Utils();
+
+  @override
+  bool get autoCommit => true;
 }

@@ -19,37 +19,6 @@ import 'kafka_consumer.dart';
 import 'kafka_producer.dart';
 
 class KafkaClient {
-  /// @Parameter brokers
-  ///    A list containing only the Host Address and the Port to access N Kafka Brokers
-  factory KafkaClient({
-    required List<Broker> brokers,
-    required int rebalanceTimeoutMs,
-    required int sessionTimeoutMs,
-    String? clientId,
-  }) {
-    _instance ??= KafkaClient._(
-      brokers: brokers,
-      rebalanceTimeoutMs: rebalanceTimeoutMs,
-      sessionTimeoutMs: sessionTimeoutMs,
-      clientId: clientId,
-    );
-    return _instance!;
-  }
-
-  KafkaClient._({
-    required List<Broker> brokers,
-    required this.rebalanceTimeoutMs,
-    required this.sessionTimeoutMs,
-    required this.clientId,
-  }) {
-    _cluster.setBrokers(brokers);
-    _trafficControler = TrafficControler(
-      cluster: _cluster,
-      eventController: _eventController,
-      kafka: this,
-      admin: getAdminClient(),
-    );
-  }
   late final TrafficControler _trafficControler;
 
   final StreamController _eventController = StreamController();
@@ -63,8 +32,44 @@ class KafkaClient {
   late final KafkaProducer _producer;
   final int rebalanceTimeoutMs;
   final int sessionTimeoutMs;
+  final bool autoCommit;
 
   static KafkaClient? _instance;
+
+  /// @Parameter brokers
+  ///    A list containing only the Host Address and the Port to access N Kafka Brokers
+  factory KafkaClient({
+    required List<Broker> brokers,
+    required int rebalanceTimeoutMs,
+    required int sessionTimeoutMs,
+    bool autoCommit = true,
+    String? clientId,
+  }) {
+    _instance ??= KafkaClient._(
+      brokers: brokers,
+      rebalanceTimeoutMs: rebalanceTimeoutMs,
+      sessionTimeoutMs: sessionTimeoutMs,
+      clientId: clientId,
+      autoCommit: autoCommit,
+    );
+    return _instance!;
+  }
+
+  KafkaClient._({
+    required List<Broker> brokers,
+    required this.rebalanceTimeoutMs,
+    required this.sessionTimeoutMs,
+    required this.clientId,
+    required this.autoCommit,
+  }) {
+    _cluster.setBrokers(brokers);
+    _trafficControler = TrafficControler(
+      cluster: _cluster,
+      eventController: _eventController,
+      kafka: this,
+      admin: getAdminClient(),
+    );
+  }
 
   Stream get eventStream => _eventController.stream.asBroadcastStream();
   bool get hasPendingProcesses => _trafficControler.hasPendingProcesses;
