@@ -16,11 +16,8 @@ analyzer:
     implicit-dynamic: false
   
   errors:
-    # Treat missing required parameters as errors
     missing_required_param: error
-    # Treat unused imports as errors
     unused_import: error
-    # Treat unused local variables as errors
     unused_local_variable: ignore
 
 linter:
@@ -146,13 +143,13 @@ linter:
     prefer_spread_collections: true
     prefer_typing_uninitialized_variables: true
     provide_deprecation_message: true
-    public_member_api_docs: false  # Set to true if you want to enforce documentation
+    public_member_api_docs: false  # Set to true to enforce documentation
     recursive_getters: true
     slash_for_doc_comments: true
     sort_child_properties_last: true
-    sort_constructors_first: true
+    sort_constructors_first: false
     sort_pub_dependencies: true
-    sort_unnamed_constructors_first: true
+    sort_unnamed_constructors_first: false
     type_annotate_public_apis: true
     type_init_formals: true
     unawaited_futures: false
